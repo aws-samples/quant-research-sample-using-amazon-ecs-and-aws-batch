@@ -1,0 +1,74 @@
+{
+  "availability_zone": {
+    "name": "us-east-1a",
+    "id": "use1-az4"
+  },
+  "app_with_fsx": true,
+  "app_with_s3express": true,
+  "batch": {
+    "deployment_type": "ALL",
+    "single_node": {
+      "maxv_cpus": 32000,
+      "minv_cpus": 0,
+      "num_queues": 4,
+      "container_cpu": 4,
+      "container_memory": 8192,
+      "container_command": [
+        "python3",
+        "main.py"
+      ],
+      "instance_classes": [
+        "R5",
+        "R6A",
+        "R6I",
+        "R5A",
+        "R7I",
+        "R5N",
+        "R5D",
+        "R5B"
+      ],
+      "allocation_strategy": "BEST_FIT_PROGRESSIVE",
+      "spot": false
+    },
+    "multi_node": {
+      "maxv_cpus": 32000,
+      "minv_cpus": 0,
+      "main": {
+        "start_node_index": 0,
+        "end_node_index": 0,
+        "container_cpu": 4,
+        "container_gpu": 1,
+        "container_memory": 8192,
+        "container_command": [
+          "python3",
+          "main.py"
+        ]
+      },
+      "worker": {
+        "start_node_index": 1,
+        "end_node_index": 2,
+        "container_cpu": 4,
+        "container_gpu": 1,
+        "container_memory": 8192,
+        "container_command": [
+          "python3",
+          "main.py"
+        ]
+      },
+      "instance_classes": [
+        "G5",
+        "C5"
+      ],
+      "allocation_strategy": "BEST_FIT_PROGRESSIVE",
+      "spot": false
+    }
+  },
+  "fsx": {
+    "per_unit_storage_throughput": 200,
+    "storage_capacity_gib": 1200,
+    "deployment_type": "SCRATCH_2"
+  },
+  "s3": {
+    "object_expiration_in_days": 1
+  }
+}
