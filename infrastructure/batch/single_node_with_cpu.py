@@ -87,8 +87,10 @@ class BatchJobStackForSingleNodeWithCPU(Stack):
         self.job_definition.node.add_dependency(
             *list(self.job_queues.values()),
             *list(self.compute_environments.values()),
-            self.lustre_fs,
         )
+
+        if self.lustre_fs is not None:
+            self.job_definition.node.add_dependency(self.lustre_fs)
 
     def build_job_definition(
         self, config: BatchJobConfigForSingleNodeWithCPU
