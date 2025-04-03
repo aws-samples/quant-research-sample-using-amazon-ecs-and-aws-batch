@@ -3,7 +3,7 @@
     "name": "us-east-1a",
     "id": "use1-az4"
   },
-  "app_with_codepipeline": true,
+  "app_with_codepipeline": false,
   "app_with_fsx": true,
   "app_with_s3express": true,
   "batch": {
