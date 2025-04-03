@@ -90,6 +90,7 @@ pipeline_config = PipelineConfig(
     github_repo=env_config.github_repo,
     github_branch=env_config.github_branch,
     github_token_secret_name=env_config.github_token,
+    enable_code_pipeline=params.app_with_codepipeline,
 )
 
 deployment_pipeline = DeploymentPipelineStack(

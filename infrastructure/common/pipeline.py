@@ -26,6 +26,7 @@ class PipelineConfig:
     github_repo: str
     github_branch: str
     github_token_secret_name: str
+    enable_code_pipeline: str
 
 
 class DeploymentPipelineStack(Stack):
@@ -46,11 +47,14 @@ class DeploymentPipelineStack(Stack):
         # Create ECR Repository
         self.ecr_repo = self._create_ecr_repository()
 
-        # Create CodeBuild Project
-        self.build_project = self._create_build_project()
+        # Enable CodeBuild and CodePipeline only if needed
+        if config.enable_code_pipeline:
 
-        # Create Pipeline
-        self.pipeline = self._create_pipeline()
+            # Create CodeBuild Project
+            self.build_project = self._create_build_project()
+
+            # Create Pipeline
+            self.pipeline = self._create_pipeline()
 
     def _create_ecr_repository(self) -> ecr.Repository:
         """Create ECR repository for container images"""
