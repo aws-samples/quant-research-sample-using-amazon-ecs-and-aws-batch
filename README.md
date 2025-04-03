@@ -51,7 +51,7 @@ e. Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-st
    You need to provide below permissions
     - Read access to code, commit statuses, and metadata
     - Read and Write access to repository hooks
-3. Create an AWS Secret with the GitHub personal access token value for triggering deployment via CI/CD for your
+3. **Optional:** If you enable `app_with_codepipeline` in [parameters.json](infrastructure/config/parameters.json). Create an AWS Secret with the GitHub personal access token value for triggering deployment via CI/CD for your
    application code
    ```shell
    aws secretsmanager create-secret \
@@ -65,15 +65,16 @@ e. Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-st
    # AWS account id and region where you need to deploy
    AWS_ACCOUNT_ID=012345678901
    AWS_REGION=us-east-1
-   
-   GITHUB_OWNER=github-owner
-   GITHUB_REPO=github-repo
-   
-   # Provide the secret name in AWS Secrets Manager which stores your GitHub Personal Access Token
-   GITHUB_TOKEN_SECRET_NAME=github-token
-   
+
    # Unique identifier used as a prefix for your AWS infrastructure resources
    NAMESPACE=quant-research-with-aws-batch
+   
+   # GITHUB prefixed variables are optional
+   # Only needed if you enable `app_with_codepipeline` in parameters.json
+   # The secret name is from Step#3
+   GITHUB_OWNER=github-owner
+   GITHUB_REPO=github-repo
+   GITHUB_TOKEN_SECRET_NAME=github-token
    ```
 5. If needed, modify the configurations provided in the [parameters.json](infrastructure/config/parameters.json)
 6. Build the Python virtual environment
