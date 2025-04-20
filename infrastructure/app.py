@@ -118,6 +118,7 @@ def deploy_single_node_with_cpu():
                 if params.app_with_s3express
                 else None
             ),
+            custom_s3_arns=params.s3.custom_arns,
         ),
         lustre_fs=fsx_storage.lustre_fs if params.app_with_fsx else None,
         maxv_cpus=params.batch.single_node.maxv_cpus,
@@ -157,6 +158,7 @@ def deploy_multi_node_with_gpu():
                 if params.app_with_s3express
                 else None
             ),
+            custom_s3_arns=params.s3.custom_arns,
         ),
         lustre_fs=fsx_storage.lustre_fs if params.app_with_fsx else None,
         maxv_cpus=params.batch.multi_node.maxv_cpus,

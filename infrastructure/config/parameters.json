@@ -70,6 +70,10 @@
     "deployment_type": "SCRATCH_2"
   },
   "s3": {
-    "object_expiration_in_days": 1
+    "object_expiration_in_days": 1,
+    "custom_arns": [
+      "arn:aws:s3:::amzn-s3-demo-bucket/",
+      "arn:aws:s3:::amzn-s3-demo-bucket1/"
+    ]
   }
 }

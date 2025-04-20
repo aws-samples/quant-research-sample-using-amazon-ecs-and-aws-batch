@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from aws_cdk import (
     Stack,
@@ -18,6 +18,7 @@ class S3BucketArnConfig:
 
     s3_standard_bucket_arn: str
     s3_express_bucket_arn: str
+    custom_s3_arns: List[str]
 
 
 @dataclass
@@ -95,6 +96,10 @@ class BatchJobConstruct(Construct):
         if s3_express_policy := self._create_s3_express_policy():
             policies.update(s3_express_policy)
 
+        # Add S3 custom arn policies if configured
+        if s3_custom_policy := self._create_s3_custom_policies():
+            policies.update(s3_custom_policy)
+
         # Add required Glue policy
         policies.update(self._create_glue_policy())
 
@@ -105,6 +110,31 @@ class BatchJobConstruct(Construct):
         policies.update(self._create_cloudwatch_policy())
 
         return policies
+
+    def _create_s3_custom_policies(self) -> Optional[Dict[str, iam.PolicyDocument]]:
+        """Creates S3 custom arn policies if configured."""
+        if (
+            not hasattr(self, "s3_bucket_config")
+            or not self.s3_bucket_config.custom_s3_arns
+        ):
+            return None
+
+        return {
+            "ReadWriteS3CustomLocations": iam.PolicyDocument(
+                statements=[
+                    iam.PolicyStatement(
+                        sid="CustomS3Access",
+                        actions=[
+                            "s3:ListBucket",
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject",
+                        ],
+                        resources=self.s3_bucket_config.custom_s3_arns,
+                    ),
+                ]
+            )
+        }
 
     def _create_s3_standard_policy(self) -> Optional[Dict[str, iam.PolicyDocument]]:
         """Creates S3 standard bucket policy if configured."""
