@@ -9,7 +9,7 @@ from infrastructure.common.network import NetworkStack
 
 def test_network_created():
     app = core.App()
-    env = core.Environment(account="123456789012", region="us-east-1")
+    env = core.Environment(account="012345678901", region="us-east-1")
 
     stack = NetworkStack(
         app,

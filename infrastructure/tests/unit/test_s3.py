@@ -9,7 +9,7 @@ from infrastructure.common.s3 import S3Stack
 
 def test_s3_created():
     app = core.App()
-    env = core.Environment(account="123456789012", region="us-east-1")
+    env = core.Environment(account="012345678901", region="us-east-1")
 
     stack = S3Stack(
         app,

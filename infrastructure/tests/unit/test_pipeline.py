@@ -9,7 +9,7 @@ from infrastructure.common.pipeline import PipelineConfig, DeploymentPipelineSta
 
 def test_pipeline_created():
     app = core.App()
-    env = core.Environment(account="123456789012", region="us-east-1")
+    env = core.Environment(account="012345678901", region="us-east-1")
 
     pipeline_config = PipelineConfig(
         namespace="infrastructure",
@@ -17,6 +17,7 @@ def test_pipeline_created():
         github_repo="github_repo",
         github_branch="main",
         github_token_secret_name="github-token",
+        enable_code_pipeline=True,
     )
 
     deployment_pipeline = DeploymentPipelineStack(

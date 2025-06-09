@@ -82,8 +82,8 @@ class BatchJobStackForMultiNodeWithGPU(Stack):
             ),
         )
 
-        # Building EC2 fleet resources
-        self.user_data = self.build_user_data_for_lustre()
+        # Building EC2 launch template
+        self.user_data = self.build_user_data()
         self.launch_template = self.build_launch_template()
         self.efa_security_group = ec2.SecurityGroup(
             self,
@@ -291,17 +291,17 @@ class BatchJobStackForMultiNodeWithGPU(Stack):
                 "/aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended/image_id"
             ),
             detailed_monitoring=True,
-            user_data=(self.user_data if self.lustre_fs is not None else None),
+            user_data=self.user_data,
         )
 
-    def build_user_data_for_lustre(self):
+    def build_user_data(self):
         """
-        Creates a user data script to mount the Lustre file system.
+        Creates a user data script for compute environment EC2 instances.
         """
-        user_data = None
+        user_data = ec2.MultipartUserData()
+        user_data.add_user_data_part(ec2.UserData.for_linux(), make_default=True)
         if self.lustre_fs is not None:
-            user_data = ec2.MultipartUserData()
-            user_data.add_user_data_part(ec2.UserData.for_linux(), make_default=True)
+            # Add lustre filesystem condition
             user_data.add_commands(
                 f"fsx_directory={self.batch_job_construct.MOUNT_PATH}",
                 "dnf install -y lustre-client",

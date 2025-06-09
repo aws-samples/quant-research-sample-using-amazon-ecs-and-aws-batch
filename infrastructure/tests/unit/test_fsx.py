@@ -12,7 +12,7 @@ from infrastructure.common.fsx import FSxStack
 
 def test_fsx_created():
     app = core.App()
-    env = core.Environment(account="123456789012", region="us-east-1")
+    env = core.Environment(account="012345678901", region="us-east-1")
 
     # Create mock subnet
     mock_subnet = Mock(spec=ec2.ISubnet)

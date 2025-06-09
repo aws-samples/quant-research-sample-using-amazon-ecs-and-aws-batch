@@ -29,7 +29,7 @@ b. AWS CDK - `v2.1007.0`
  nvm install --lts
 
  # Install AWS CDK
- npm install -g aws-cdk@2.1007.0
+ npm install -g aws-cdk@2.1018.0
  ```
 
 c. Install `curl` and `jq`
