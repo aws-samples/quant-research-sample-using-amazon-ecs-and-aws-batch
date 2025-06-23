@@ -38,8 +38,8 @@ class BatchJobConfigForSingleNodeWithCPU:
     maxv_cpus: int
     minv_cpus: int = 0
     num_queues: int = 1
-    container_memory: int = 2048
-    container_cpu: int = 2
+    container_memory: int = 32768  # Increased from 2GB to 32GB for memory-intensive ML workloads
+    container_cpu: int = 8  # Increased proportionally with memory
     container_command: Optional[List[str]] = None
     instance_classes: Optional[List[str]] = None
     allocation_strategy: str = "BEST_FIT_PROGRESSIVE"
@@ -199,7 +199,7 @@ class BatchJobStackForSingleNodeWithCPU(Stack):
 
     def build_launch_template(self) -> ec2.LaunchTemplate:
         """
-        Creates an EC2 launch template for AWS Batch.
+        Creates an EC2 launch template for AWS Batch with increased root volume size.
         """
         return ec2.LaunchTemplate(
             self,
@@ -210,6 +210,20 @@ class BatchJobStackForSingleNodeWithCPU(Stack):
             ),
             detailed_monitoring=True,
             user_data=self.user_data,
+            # Increase root volume size for ML storage
+            block_devices=[
+                ec2.BlockDevice(
+                    device_name="/dev/xvda",  # Root device
+                    volume=ec2.BlockDeviceVolume.ebs(
+                        volume_size=100,  # Increase root volume to 100GB
+                        volume_type=ec2.EbsDeviceVolumeType.GP3,
+                        encrypted=True,
+                        delete_on_termination=True,
+                        iops=3000,  # High performance IOPS
+                        throughput=125  # MiB/s throughput for GP3
+                    )
+                )
+            ]
         )
 
     def build_user_data(self):
@@ -218,6 +232,7 @@ class BatchJobStackForSingleNodeWithCPU(Stack):
         """
         user_data = ec2.MultipartUserData()
         user_data.add_user_data_part(ec2.UserData.for_linux(), make_default=True)
+        
         if self.lustre_fs is not None:
             # Add lustre filesystem condition
             user_data.add_commands(

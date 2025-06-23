@@ -281,7 +281,7 @@ class BatchJobStackForMultiNodeWithGPU(Stack):
 
     def build_launch_template(self) -> ec2.LaunchTemplate:
         """
-        Creates an EC2 launch template for AWS Batch.
+        Creates an EC2 launch template for AWS Batch with increased root volume size.
         """
         return ec2.LaunchTemplate(
             self,
@@ -292,6 +292,20 @@ class BatchJobStackForMultiNodeWithGPU(Stack):
             ),
             detailed_monitoring=True,
             user_data=self.user_data,
+            # Increase root volume size for ML storage
+            block_devices=[
+                ec2.BlockDevice(
+                    device_name="/dev/xvda",  # Root device
+                    volume=ec2.BlockDeviceVolume.ebs(
+                        volume_size=100,  # Increase root volume to 100GB
+                        volume_type=ec2.EbsDeviceVolumeType.GP3,
+                        encrypted=True,
+                        delete_on_termination=True,
+                        iops=3000,  # High performance IOPS
+                        throughput=125  # MiB/s throughput for GP3
+                    )
+                )
+            ]
         )
 
     def build_user_data(self):
@@ -300,6 +314,7 @@ class BatchJobStackForMultiNodeWithGPU(Stack):
         """
         user_data = ec2.MultipartUserData()
         user_data.add_user_data_part(ec2.UserData.for_linux(), make_default=True)
+        
         if self.lustre_fs is not None:
             # Add lustre filesystem condition
             user_data.add_commands(
