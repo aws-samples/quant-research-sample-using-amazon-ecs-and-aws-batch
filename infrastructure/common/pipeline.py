@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_codepipeline_actions as pipeline_actions,
     aws_codebuild as codebuild,
     aws_ecr as ecr,
+    aws_iam as aws_iam,
     SecretValue,
     Duration,
     RemovalPolicy,
@@ -76,16 +77,19 @@ class DeploymentPipelineStack(Stack):
 
     def _create_build_project(self) -> codebuild.PipelineProject:
         """Create CodeBuild project for container image build"""
-        return codebuild.PipelineProject(
+        build_project = codebuild.PipelineProject(
             self,
             "ContainerImageBuildProject",
             project_name=f"{self.config.namespace}-image-build",
             environment=codebuild.BuildEnvironment(
                 privileged=True,  # Required for container image builds
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
-                compute_type=codebuild.ComputeType.SMALL,
+                compute_type=codebuild.ComputeType.MEDIUM,  # Faster builds with more CPU/memory
             ),
-            cache=codebuild.Cache.local(codebuild.LocalCacheMode.DOCKER_LAYER),
+            cache=codebuild.Cache.local(
+                codebuild.LocalCacheMode.DOCKER_LAYER,
+                codebuild.LocalCacheMode.CUSTOM
+            ),
             timeout=Duration.minutes(30),
             environment_variables={
                 "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(
@@ -100,7 +104,6 @@ class DeploymentPipelineStack(Stack):
                         "pre_build": {
                             "commands": [
                                 "echo Logging in to Amazon ECR...",
-                                "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI",
                                 "COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)",
                                 "IMAGE_TAG=${COMMIT_HASH:=latest}",
                             ]
@@ -109,6 +112,7 @@ class DeploymentPipelineStack(Stack):
                             "commands": [
                                 "echo Build started on `date`",
                                 "echo Building the Docker image...",
+                                "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com",
                                 "docker build -t $ECR_REPOSITORY_URI:$IMAGE_TAG .",
                                 "docker tag $ECR_REPOSITORY_URI:$IMAGE_TAG $ECR_REPOSITORY_URI:latest",
                             ]
@@ -117,6 +121,7 @@ class DeploymentPipelineStack(Stack):
                             "commands": [
                                 "echo Build completed on `date`",
                                 "echo Pushing the Docker image...",
+                                "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI",
                                 "docker push $ECR_REPOSITORY_URI:$IMAGE_TAG",
                                 "docker push $ECR_REPOSITORY_URI:latest",
                                 "echo Writing image definitions file...",
@@ -128,6 +133,21 @@ class DeploymentPipelineStack(Stack):
                 }
             ),
         )
+        
+        # Add permissions to access AWS Deep Learning Containers
+        build_project.add_to_role_policy(
+            aws_iam.PolicyStatement(
+                effect=aws_iam.Effect.ALLOW,
+                actions=[
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage"
+                ],
+                resources=["arn:aws:ecr:us-east-1:763104351884:repository/pytorch-training"]
+            )
+        )
+        
+        return build_project
 
     def _create_pipeline(self) -> codepipeline.Pipeline:
         """Create CodePipeline"""

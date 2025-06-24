@@ -5,41 +5,34 @@
   },
   "app_with_codepipeline": false,
   "app_with_fsx": false,
-  "app_with_s3express": true,
+  "app_with_s3express": false,
   "batch": {
     "deployment_type": "ALL",
     "single_node": {
-      "maxv_cpus": 32000,
+      "maxv_cpus": 50,
       "minv_cpus": 0,
-      "num_queues": 4,
-      "container_cpu": 4,
-      "container_memory": 8192,
+      "num_queues": 1,
+      "container_cpu": 8,
+      "container_memory": 16384,
       "container_command": [
         "python3",
         "main.py"
       ],
       "instance_classes": [
-        "R5",
-        "R6A",
-        "R6I",
-        "R5A",
-        "R7I",
-        "R5N",
-        "R5D",
-        "R5B"
+        "C6I", "C7A", "C7I", "R5", "R5A", "R5B", "R5D", "R5N", "R6A", "R6I", "R7I"
       ],
       "allocation_strategy": "BEST_FIT_PROGRESSIVE",
-      "spot": true
+      "spot": false
     },
     "multi_node": {
-      "maxv_cpus": 32000,
+      "maxv_cpus": 100,
       "minv_cpus": 0,
       "main": {
         "start_node_index": 0,
         "end_node_index": 0,
-        "container_cpu": 4,
-        "container_gpu": 1,
-        "container_memory": 8192,
+        "container_cpu": 32,
+        "container_gpu": 4,
+        "container_memory": 65536,
         "container_command": [
           "python3",
           "main.py"
@@ -48,9 +41,9 @@
       "worker": {
         "start_node_index": 1,
         "end_node_index": 2,
-        "container_cpu": 4,
-        "container_gpu": 1,
-        "container_memory": 8192,
+        "container_cpu": 32,
+        "container_gpu": 4,
+        "container_memory": 65536,
         "container_command": [
           "python3",
           "main.py"

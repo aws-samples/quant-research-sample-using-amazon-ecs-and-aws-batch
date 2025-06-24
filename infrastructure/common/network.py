@@ -31,6 +31,7 @@ class NetworkStack(Stack):
         "EC2": ec2.InterfaceVpcEndpointAwsService.EC2,
         "KMS": ec2.InterfaceVpcEndpointAwsService.KMS,
         "Batch": ec2.InterfaceVpcEndpointAwsService.BATCH,
+        "Glue": ec2.InterfaceVpcEndpointAwsService.GLUE,
     }
 
     def __init__(

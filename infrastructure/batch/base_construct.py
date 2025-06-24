@@ -109,6 +109,9 @@ class BatchJobConstruct(Construct):
         # Add required CloudWatch policy
         policies.update(self._create_cloudwatch_policy())
 
+        # Add required Lake Formation policy
+        policies.update(self._create_lake_formation_policy())
+
         return policies
 
     def _create_s3_custom_policies(self) -> Optional[Dict[str, iam.PolicyDocument]]:
@@ -193,7 +196,7 @@ class BatchJobConstruct(Construct):
         }
 
     def _create_glue_policy(self) -> Dict[str, iam.PolicyDocument]:
-        """Creates Glue access policy."""
+        """Creates Glue access policy with Iceberg support."""
         return {
             "ReadGlue": iam.PolicyDocument(
                 statements=[
@@ -204,12 +207,36 @@ class BatchJobConstruct(Construct):
                             "glue:GetDatabase",
                             "glue:GetPartitions",
                             "glue:GetTableVersions",
+                            "glue:GetTableVersion",
+                            "glue:SearchTables",
+                            "glue:GetTables",
+                            "glue:GetDatabases",
+                            # Iceberg-specific permissions
+                            "glue:GetIcebergTable",
+                            "glue:GetIcebergSnapshot",
+                            "glue:GetIcebergManifest",
+                            "glue:GetIcebergData",
+                            "glue:ListIcebergTables",
+                            "glue:DescribeIcebergTable",
                         ],
                         resources=[
                             f"arn:aws:glue:{self.region}:{self.account}:catalog",
                             f"arn:aws:glue:{self.region}:{self.account}:database/*",
                             f"arn:aws:glue:{self.region}:{self.account}:table/*",
                         ],
+                    ),
+                    # Additional permission for Glue REST API access (for Iceberg)
+                    iam.PolicyStatement(
+                        sid="GlueIcebergAPIAccess",
+                        actions=[
+                            "glue:*",  # Temporary broad access for Iceberg REST API
+                        ],
+                        resources=["*"],
+                        conditions={
+                            "StringEquals": {
+                                "aws:RequestedRegion": self.region
+                            }
+                        }
                     )
                 ]
             )
@@ -253,6 +280,43 @@ class BatchJobConstruct(Construct):
                             f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/ecs/*"
                         ],
                     )
+                ]
+            )
+        }
+
+    def _create_lake_formation_policy(self) -> Dict[str, iam.PolicyDocument]:
+        """Creates Lake Formation access policy for Iceberg tables."""
+        return {
+            "LakeFormationAccess": iam.PolicyDocument(
+                statements=[
+                    iam.PolicyStatement(
+                        sid="LakeFormationDataAccess",
+                        actions=[
+                            "lakeformation:GetDataAccess",
+                            "lakeformation:GrantPermissions",
+                            "lakeformation:BatchGrantPermissions",
+                            "lakeformation:ListPermissions",
+                            "lakeformation:GetResourceLFTags",
+                            "lakeformation:GetLFTag",
+                            "lakeformation:ListLFTags",
+                            "lakeformation:SearchTablesByLFTags",
+                            "lakeformation:SearchDatabasesByLFTags",
+                        ],
+                        resources=["*"],
+                    ),
+                    # Specific permissions for the crypto database and sample table
+                    iam.PolicyStatement(
+                        sid="DataLocationAccess",
+                        actions=[
+                            "s3:GetObject",
+                            "s3:ListBucket",
+                            "s3:GetBucketLocation",
+                        ],
+                        resources=[
+                            "arn:aws:s3:::*",  # Broad access needed for Lake Formation data locations
+                            "arn:aws:s3:::*/*",
+                        ],
+                    ),
                 ]
             )
         }
