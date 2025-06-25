@@ -24,8 +24,8 @@ jobs:
         language: [ 'python' ]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -37,15 +37,15 @@ jobs:
         python -m pip install --upgrade pip
         # Install CDK dependencies
         if [ -f infrastructure/requirements.txt ]; then
-        pip install -r infrastructure/requirements.txt
+          pip install -r infrastructure/requirements.txt
         fi
         # Install sample application dependencies
         if [ -f samples/order_flow/requirements.txt ]; then
-        pip install -r samples/order_flow/requirements.txt
+          pip install -r samples/order_flow/requirements.txt
         fi
         # Install any root level requirements if they exist
         if [ -f requirements.txt ]; then
-        pip install -r requirements.txt
+          pip install -r requirements.txt
         fi
 
     - name: Initialize CodeQL
