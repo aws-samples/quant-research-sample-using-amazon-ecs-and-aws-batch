@@ -3,14 +3,11 @@ import json
 import pickle
 import torch
 import polars as pl
-import pandas as pd
 import numpy as np
 from typing import List, Dict, Tuple, Any
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta
-from pyiceberg.catalog import load_catalog
-from pyiceberg.exceptions import NoSuchTableError
 
 # Fix import paths to work from any directory
 import sys
@@ -25,11 +22,9 @@ from utils import log_memory_usage, force_garbage_collection
 from feature_engine import PolarsFeatureEngine, clean_features_polars, scale_features_polars, apply_scaling_polars
 from datasets import (
     PolarSequenceDataset,
-    UnderSampledDataset,
     LoadedDataset,
-    apply_undersampling_to_polar_dataset, 
-    print_dataset_distribution,
-    apply_undersampling
+    apply_undersampling_to_polar_dataset,
+    print_dataset_distribution
 )
 
 # Set up logging

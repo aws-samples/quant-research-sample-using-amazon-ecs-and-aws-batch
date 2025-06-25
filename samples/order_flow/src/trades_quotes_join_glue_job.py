@@ -1,16 +1,10 @@
 import sys
-from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
-from pyspark.sql import SparkSession
 from pyspark.sql import functions as f
-from pyspark.sql.window import Window
 from tempo.tsdf import TSDF
-import numpy as np
-import pandas as pd
-from datetime import timedelta
 
 # Initialize Glue context
 args = getResolvedOptions(sys.argv, ['JOB_NAME', 'output_database', 'output_table'])

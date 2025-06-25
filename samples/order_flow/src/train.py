@@ -1,21 +1,12 @@
 import os
 import json
-import time
 import argparse
-import numpy as np
-from pathlib import Path
-from datetime import datetime
-from typing import List, Dict, Tuple, Any
+from typing import Dict, Any
 import warnings
 warnings.filterwarnings('ignore')
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torch.distributed import init_process_group, destroy_process_group
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data.distributed import DistributedSampler
 import logging
 
 # Optional mlflow import
@@ -26,11 +17,6 @@ except ImportError:
     MLFLOW_AVAILABLE = False
     mlflow = None
 
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    classification_report, confusion_matrix, roc_auc_score
-)
-from sklearn.preprocessing import MinMaxScaler
 
 # Fix import paths to work from any directory
 import sys
@@ -46,11 +32,8 @@ sys.path.insert(0, parent_dir)   # Add order_flow directory
 try:
     from polars_dataprovider import PolarsDataProvider
     from datasets import OptimizedSequenceDataset  # Updated import
-    from model_factory import ModelFactory
     from trainer import ModelTrainer
     from evaluator import ModelEvaluator
-    import models
-    from utils import get_model_components
 except ImportError as e:
     print(f"Import error: {e}")
     print(f"Current working directory: {os.getcwd()}")

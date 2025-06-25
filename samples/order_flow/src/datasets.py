@@ -4,7 +4,6 @@ Dataset classes for memory-efficient sequence data handling.
 
 import time
 import torch
-import numpy as np
 import polars as pl
 from torch.utils.data import Dataset
 from typing import List

@@ -1,34 +1,21 @@
 import os
 import json
-import time
 import pickle
-import gc
-import psutil
-import numpy as np
-import polars as pl
-import pandas as pd
 import torch
-from torch.utils.data import Dataset, TensorDataset
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
-import boto3
-from typing import Optional, List, Dict, Tuple, Any
-import warnings
+from typing import Dict, Any
 import logging
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Import pyiceberg only when needed to avoid conflicts with boto3
 try:
-    from pyiceberg.catalog import load_catalog
-    from pyiceberg.exceptions import NoSuchTableError
     PYICEBERG_AVAILABLE = True
 except ImportError:
     PYICEBERG_AVAILABLE = False
 
 # Import the classes from refactored modules
 from polars_dataprovider import PolarsDataProvider as BasePolarsDataProvider
-from feature_engine import PolarsFeatureEngine
 from datasets import OptimizedSequenceDataset
 from utils import log_memory_usage, force_garbage_collection
 
