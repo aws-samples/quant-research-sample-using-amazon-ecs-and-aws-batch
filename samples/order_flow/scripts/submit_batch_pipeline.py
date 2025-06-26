@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
 """
 AWS Batch pipeline submission script for ML training pipeline.
 This script submits both data preparation and model training jobs to AWS Batch.
