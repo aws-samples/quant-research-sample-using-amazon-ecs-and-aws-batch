@@ -52,7 +52,7 @@ try:
         print(f"Table {output_database}.{output_table} exists")
     else:
         raise Exception("Table does not exist")
-except:
+except Exception:
     print(
         f"Creating optimized table {output_database}.{output_table} with hidden partitioning"
     )

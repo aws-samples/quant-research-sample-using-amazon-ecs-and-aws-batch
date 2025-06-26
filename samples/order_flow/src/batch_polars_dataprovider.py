@@ -11,12 +11,6 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
-# Import pyiceberg only when needed to avoid conflicts with boto3
-try:
-    PYICEBERG_AVAILABLE = True
-except ImportError:
-    PYICEBERG_AVAILABLE = False
-
 # Import the classes from refactored modules
 from polars_dataprovider import PolarsDataProvider as BasePolarsDataProvider
 from datasets import OptimizedSequenceDataset
@@ -33,12 +27,12 @@ class BatchPolarsDataProvider(BasePolarsDataProvider):
     """Extended PolarsDataProvider with S3 upload capabilities for AWS Batch."""
 
     def __init__(self, device, config_dict):
-        super().__init__(device, config_dict)
+        region = config_dict.get("s3", {}).get("region", "us-east-1")
+        super().__init__(device, config_dict, region=region)
 
         # S3 configuration
         self.s3_bucket = config_dict.get("s3", {}).get("bucket_name", None)
         self.s3_prefix = config_dict.get("s3", {}).get("prefix", "ml-pipeline")
-        self.region = config_dict.get("s3", {}).get("region", "us-east-1")
 
         # Initialize S3 client with error handling
         if self.s3_bucket:
