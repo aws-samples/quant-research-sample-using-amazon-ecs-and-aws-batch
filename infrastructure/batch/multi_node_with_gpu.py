@@ -302,10 +302,10 @@ class BatchJobStackForMultiNodeWithGPU(Stack):
                         encrypted=True,
                         delete_on_termination=True,
                         iops=3000,  # High performance IOPS
-                        throughput=125  # MiB/s throughput for GP3
-                    )
+                        throughput=125,  # MiB/s throughput for GP3
+                    ),
                 )
-            ]
+            ],
         )
 
     def build_user_data(self):
@@ -314,7 +314,7 @@ class BatchJobStackForMultiNodeWithGPU(Stack):
         """
         user_data = ec2.MultipartUserData()
         user_data.add_user_data_part(ec2.UserData.for_linux(), make_default=True)
-        
+
         if self.lustre_fs is not None:
             # Add lustre filesystem condition
             user_data.add_commands(

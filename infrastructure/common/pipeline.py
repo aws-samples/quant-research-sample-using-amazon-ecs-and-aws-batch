@@ -87,8 +87,7 @@ class DeploymentPipelineStack(Stack):
                 compute_type=codebuild.ComputeType.MEDIUM,  # Faster builds with more CPU/memory
             ),
             cache=codebuild.Cache.local(
-                codebuild.LocalCacheMode.DOCKER_LAYER,
-                codebuild.LocalCacheMode.CUSTOM
+                codebuild.LocalCacheMode.DOCKER_LAYER, codebuild.LocalCacheMode.CUSTOM
             ),
             timeout=Duration.minutes(30),
             environment_variables={
@@ -133,7 +132,7 @@ class DeploymentPipelineStack(Stack):
                 }
             ),
         )
-        
+
         # Add permissions to access AWS Deep Learning Containers
         build_project.add_to_role_policy(
             aws_iam.PolicyStatement(
@@ -141,12 +140,14 @@ class DeploymentPipelineStack(Stack):
                 actions=[
                     "ecr:BatchCheckLayerAvailability",
                     "ecr:GetDownloadUrlForLayer",
-                    "ecr:BatchGetImage"
+                    "ecr:BatchGetImage",
                 ],
-                resources=["arn:aws:ecr:us-east-1:763104351884:repository/pytorch-training"]
+                resources=[
+                    "arn:aws:ecr:us-east-1:763104351884:repository/pytorch-training"
+                ],
             )
         )
-        
+
         return build_project
 
     def _create_pipeline(self) -> codepipeline.Pipeline:
