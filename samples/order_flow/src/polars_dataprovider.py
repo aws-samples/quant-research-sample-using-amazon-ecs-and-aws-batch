@@ -45,7 +45,7 @@ logger = logging.getLogger("polars_dataprovider")
 class PolarsDataProvider:
     """Memory-efficient data provider using Polars with integrated undersampling."""
 
-    def __init__(self, device, config_dict):
+    def __init__(self, device, config_dict, region=None):
         """Initialize the data provider with configuration parameters."""
         # Data source configuration
         self.data_path = config_dict["data"].get("data_path", None)
@@ -56,8 +56,10 @@ class PolarsDataProvider:
             else config_dict["data"]["feature_cols"]
         )
 
-        # Iceberg configuration
-        self.region = config_dict["data"].get("region", "us-east-1")
+        # Iceberg configuration - use the region parameter instead of config
+        self.region = (
+            region if region else config_dict["data"].get("region", "us-east-1")
+        )
         self.instrument_filter = config_dict["data"].get("instrument_filter", None)
         if self.instrument_filter:
             if isinstance(self.instrument_filter, str):

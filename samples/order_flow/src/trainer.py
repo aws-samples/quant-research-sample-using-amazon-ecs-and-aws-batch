@@ -112,7 +112,7 @@ class ModelTrainer:
 
         # Mixed precision setup
         use_amp = torch.cuda.is_available()
-        scaler_amp = torch.cuda.amp.GradScaler() if use_amp else None
+        torch.cuda.amp.GradScaler() if use_amp else None
         if use_amp:
             logger.info("✓ Using mixed precision for faster training")
 
@@ -257,7 +257,7 @@ class ModelTrainer:
             if val_accuracy > best_accuracy:
                 best_accuracy = val_accuracy
                 best_loss = avg_val_loss
-                model_save_path = self._save_best_model(
+                self._save_best_model(
                     model,
                     optimizer,
                     scaler,
