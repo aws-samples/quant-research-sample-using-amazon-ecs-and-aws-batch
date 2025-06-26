@@ -233,11 +233,9 @@ class BatchJobConstruct(Construct):
                         ],
                         resources=["*"],
                         conditions={
-                            "StringEquals": {
-                                "aws:RequestedRegion": self.region
-                            }
-                        }
-                    )
+                            "StringEquals": {"aws:RequestedRegion": self.region}
+                        },
+                    ),
                 ]
             )
         }
