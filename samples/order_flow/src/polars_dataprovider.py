@@ -45,7 +45,7 @@ logger = logging.getLogger("polars_dataprovider")
 class PolarsDataProvider:
     """Memory-efficient data provider using Polars with integrated undersampling."""
 
-    def __init__(self, device, config_dict, region):
+    def __init__(self, device, config_dict, region=None):
         """Initialize the data provider with configuration parameters."""
         # Data source configuration
         self.data_path = config_dict["data"].get("data_path", None)
