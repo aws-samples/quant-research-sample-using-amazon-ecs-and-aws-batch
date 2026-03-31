@@ -1,22 +1,3 @@
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: MIT-0
-
-*.swp
-package-lock.json
-__pycache__
-.pytest_cache
-.venv
-*.egg-info
-*.bat
-
-# CDK asset staging directory
-.cdk.staging
-cdk.out
-cdk.context.json
-
-# IDEs
-.idea/
-
 # ============================================
 # Python
 # ============================================
@@ -57,23 +38,23 @@ htmlcov/
 *.key
 
 # CDK (compiled output, synth artifacts, node deps)
-.cdk.staging
-cdk.out
-cdk.context.json
-node_modules/
-outputs.json
-**/cdk/**/*.js
-**/cdk/**/*.d.ts
-!**/cdk/jest.config.js
+cdk/node_modules/
+cdk/cdk.out/
+cdk/outputs.json
+cdk/**/*.js
+cdk/**/*.d.ts
+!cdk/jest.config.js
 
-# CDK generated files
-deploy.log
-infrastructure-summary.json
-package-lock.json
+# CDK generated files that shouldn't be committed
+cdk/deploy.log
+cdk/infrastructure-summary.json
 
 # ============================================
 # Configuration
 # ============================================
+
+# Working configs — contain account-specific values
+# Use generate-config.sh to create from stack outputs
 config.json
 config-custom-*.json
 config-with-arn-example.json
@@ -94,11 +75,17 @@ credentials.json
 # ============================================
 # Project artifacts
 # ============================================
+
+# Output data
 *.parquet
 output/
 results/
+
+# Logs
 *.log
 logs/
+
+# Cleanup/review lists
 candidates_delete.txt
 
 # ============================================
@@ -112,7 +99,7 @@ candidates_delete.txt
 .DS_Store
 Thumbs.db
 
-# Kiro
+# Kiro (keep specs and steering, ignore cache)
 .kiro/cache/
 .kiro/logs/
 .kiro/.session_*
@@ -122,6 +109,5 @@ Thumbs.db
 # ============================================
 *.tmp
 *.bak
-*.bat
 .ipynb_checkpoints/
 *.ipynb
