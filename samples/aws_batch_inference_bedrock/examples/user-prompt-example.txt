@@ -1,0 +1,14 @@
+Analyze the sentiment of the following {component} for stock symbol {symbol}.
+
+Article ID: {article_id}
+Component: {component}
+Stock Symbol: {symbol}
+
+Rating Scale: {rating_min} to {rating_max}
+
+Instructions:
+- Provide a single numerical sentiment score between {rating_min} and {rating_max}
+- {rating_min} represents the most negative sentiment
+- {rating_max} represents the most positive sentiment
+- Return ONLY the numerical score, no other text
+- Do not use decimal only intergers
