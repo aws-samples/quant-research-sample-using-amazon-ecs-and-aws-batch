@@ -1,0 +1,76 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="Architecture" id="arch-poc">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1360" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Agent-Driven Deployment — POC Architecture (no auth · public-GitHub source · pull observability)" style="text;html=1;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1280" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- ===== ARROWS (back layer) ===== -->
+        <mxCell id="a1" value="chat (SSE)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#232F3E;strokeWidth=2;endArrow=block;startArrow=block;fontSize=12;" edge="1" parent="1" source="users" target="spa"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#232F3E;strokeWidth=2;endArrow=block;startArrow=block;" edge="1" parent="1" source="spa" target="agentcore"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a3" value="tool calls" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#01A88D;strokeWidth=2;endArrow=block;startArrow=block;fontSize=12;" edge="1" parent="1" source="agentcore" target="tools"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a4" value="startBuild" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0066CC;strokeWidth=2;endArrow=block;fontSize=12;" edge="1" parent="1" source="tools" target="codebuild"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a5" value="get_status / get_logs  (PULL)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#E7157B;strokeWidth=2;endArrow=block;dashed=1;fontSize=12;fontStyle=1;" edge="1" parent="1" source="cwlogs" target="tools"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="935" y="440"/></Array></mxGeometry></mxCell>
+        <mxCell id="a6" value="clone (public)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3F8624;strokeWidth=2;endArrow=block;fontSize=12;" edge="1" parent="1" source="github" target="codebuild"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a7" value="cdk deploy" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0066CC;strokeWidth=2;endArrow=block;fontSize=12;" edge="1" parent="1" source="codebuild" target="cfn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a8" value="build logs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#E7157B;strokeWidth=2;endArrow=block;fontSize=12;" edge="1" parent="1" source="codebuild" target="cwlogs"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a9" value="provisions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#ED7100;strokeWidth=2;endArrow=block;fontSize=12;" edge="1" parent="1" source="cfn" target="batch"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ===== BANDS ===== -->
+        <mxCell id="bandA" value="Frontend (no auth — POC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673A6;strokeWidth=2;verticalAlign=top;fontSize=14;fontStyle=1;fontColor=#9673A6;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1280" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="bandB" value="Agent (Bedrock AgentCore) + Tool Lambdas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#01A88D;strokeWidth=2;verticalAlign=top;fontSize=14;fontStyle=1;fontColor=#01A88D;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="245" width="1280" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="bandC" value="Execution + Pull Observability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#0066CC;strokeWidth=2;verticalAlign=top;fontSize=14;fontStyle=1;fontColor=#0066CC;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="430" width="1280" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="bandD" value="Deployed Solution (target account)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#ED7100;strokeWidth=2;verticalAlign=top;fontSize=14;fontStyle=1;fontColor=#ED7100;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="625" width="1280" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- ===== ICONS ===== -->
+        <mxCell id="users" value="Operator" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.user;labelBackgroundColor=none;fillColor=#232F3E;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="160" y="115" width="70" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="spa" value="CloudFront + S3&#10;React SPA (chat + status)" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudfront;labelBackgroundColor=none;fillColor=#8C4FFF;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="640" y="115" width="70" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agentcore" value="Bedrock AgentCore&#10;(Claude + memory)" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock_agentcore;labelBackgroundColor=none;fillColor=#01A88D;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="350" y="295" width="70" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="tools" value="Tool Lambdas&#10;validate · start_deployment · get_status" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;labelBackgroundColor=none;fillColor=#ED7100;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="900" y="295" width="70" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="github" value="GitHub (public repo)&#10;aws-samples/quant-research…" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.git_hub;labelBackgroundColor=none;fillColor=#232F3E;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="160" y="480" width="70" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="codebuild" value="CodeBuild&#10;(admin role — POC §11a)" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.codebuild;labelBackgroundColor=none;fillColor=#0066CC;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="450" y="480" width="70" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cfn" value="CloudFormation&#10;(the stacks)" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudformation;labelBackgroundColor=none;fillColor=#E7157B;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="640" y="480" width="70" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cwlogs" value="CloudWatch Logs&#10;(build logs)" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch_2;labelBackgroundColor=none;fillColor=#E7157B;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="480" width="70" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="batch" value="AWS Batch + VPC + S3 + (FSx)&#10;per config toggles" style="sketch=0;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.batch;labelBackgroundColor=none;fillColor=#ED7100;strokeColor=#ffffff;pointerEvents=1;fontColor=#232F3E;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="640" y="670" width="70" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="Solid = action · Dashed pink = agent PULLS status on demand (no push: no AppSync / EventBridge / Live Tail relay)" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="60" y="800" width="1240" height="24" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
