@@ -14,7 +14,7 @@
 #   6. SPA build → S3 sync → CloudFront invalidate
 #
 # Usage:
-#   AWS_PROFILE=dialseny-burner-1 ./deploy-console.sh
+#   AWS_PROFILE=<your-profile> ./deploy-console.sh
 #
 # Env (override as needed):
 #   AWS_PROFILE     (required)         AWS_REGION   (default us-east-1)
@@ -30,7 +30,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REGION="${AWS_REGION:-us-east-1}"
 NS="${NAMESPACE:-agentpoc}"
-: "${AWS_PROFILE:?set AWS_PROFILE (e.g. dialseny-burner-1)}"
+: "${AWS_PROFILE:?set AWS_PROFILE (e.g. my-sandbox-profile)}"
 export AWS_PROFILE AWS_REGION="$REGION"
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
 MODEL_ID="${BEDROCK_MODEL_ID:-us.anthropic.claude-sonnet-4-5-20250929-v1:0}"
@@ -53,9 +53,10 @@ say "1/6 CDK bootstrap"
 if aws cloudformation describe-stacks --stack-name CDKToolkit >/dev/null 2>&1; then
   ok "CDKToolkit already bootstrapped"
 else
-  venv "$INFRA"
+  # Bootstrap only provisions the CDKToolkit stack for the explicit target env;
+  # no --app needed (synthesizing the infra app would require its config/ CWD).
   CDK_DEFAULT_ACCOUNT="$ACCOUNT_ID" CDK_DEFAULT_REGION="$REGION" \
-    npx --yes cdk bootstrap "aws://$ACCOUNT_ID/$REGION" --app "$INFRA/.venv/bin/python $INFRA/app.py" >/dev/null
+    npx --yes cdk bootstrap "aws://$ACCOUNT_ID/$REGION" >/dev/null
   ok "bootstrapped"
 fi
 

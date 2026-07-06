@@ -10,8 +10,8 @@ agent's reply. The agent is a Strands Agent driving Claude (Bedrock) with 3 tool
   - start_deployment(override)           -> S3 put + CodeBuild startBuild -> build_id
   - get_deployment_status(build_id)      -> PULL: BatchGetBuilds + (optional) log tail
 
-POC posture (design Decisions 5-7): no auth, public-GitHub infra source, pull
-observability. Tools call AWS directly via boto3 — no AgentCore Gateway, no tool Lambdas.
+POC posture: no auth, public-GitHub infra source, pull observability. Tools call AWS
+directly via boto3 — no AgentCore Gateway, no tool Lambdas.
 
 Env vars (set on the agent runtime):
   ARTIFACT_BUCKET    - S3 bucket for parameter overrides

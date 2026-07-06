@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================
-   AWS theme tokens — dark default. See design/UI_DESIGN_SPEC.md §2.
+   AWS theme tokens — dark default.
    Exposed to Tailwind v4 utilities (e.g. text-aws-orange, bg-squid).
    ============================================================ */
 @theme {

@@ -4,9 +4,6 @@ A chat-driven, AWS-themed deployment console. An operator talks to an agent on t
 left; a live deployment canvas on the right animates the config forming, the CodeBuild
 phases progressing, the architecture lighting up, and logs streaming.
 
-Built per `../design/UI_DESIGN_SPEC.md`, mirroring the validated agent in
-`../design/VALIDATION_REPORT.md`.
-
 ## Run
 
 ```bash

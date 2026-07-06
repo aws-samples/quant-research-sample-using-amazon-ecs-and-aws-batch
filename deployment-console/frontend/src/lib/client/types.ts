@@ -1,4 +1,4 @@
-// Data contract shared by Mock + Live clients. See UI_DESIGN_SPEC.md §7.
+// Data contract shared by Mock + Live clients.
 
 /** CodeBuild phase identifiers, mirrored from the real agent. */
 export type PhaseName =

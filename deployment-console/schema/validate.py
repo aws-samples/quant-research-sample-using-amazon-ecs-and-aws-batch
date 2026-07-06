@@ -5,8 +5,8 @@
 Two layers:
   1. Structural validation against config.schema.json (JSON Schema Draft 2020-12).
   2. Cross-field rules that JSON Schema cannot express (conditionals, arithmetic,
-     locked fields). These mirror the CDK app's own runtime expectations and the
-     rules in design/CONFIG_SCHEMA_PLAN.md section 4.
+     locked fields). These mirror the CDK app's own runtime expectations; each rule
+     is documented inline where it is implemented below.
 
 Returns a ValidationReport with hard errors (block deploy) and warnings (advisory).
 This module is the contract the `validate_config` agent tool calls. It must NEVER
@@ -97,7 +97,7 @@ def _cross_field(
     deployment_identity: Optional[dict[str, Any]],
     report: ValidationReport,
 ) -> None:
-    """Layer 2: rules from CONFIG_SCHEMA_PLAN.md section 4."""
+    """Layer 2: cross-field rules (documented inline per rule below)."""
 
     # Rule 1: S3 Express requires availability_zone.id
     if params.get("app_with_s3express"):

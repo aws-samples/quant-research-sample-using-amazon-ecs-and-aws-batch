@@ -1,24 +1,24 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 #
-# CodeBuild buildspec for the Phase 0 headless deployment slice.
+# CodeBuild buildspec for the headless deployment slice.
 #
-# Inputs (environment variables, set by start_deployment Lambda via SFN / startBuild):
+# Inputs (environment variables, set by the start_deployment Lambda via startBuild):
 #   NAMESPACE           - resource prefix for this deployment (validated S3-safe)
 #   TARGET_ACCOUNT_ID   - AWS account to deploy into (the build runs in this account)
 #   TARGET_REGION       - AWS region
 #   OVERRIDE_S3_URI      - s3:// URI of the agent-produced parameter OVERRIDE (partial)
 #   RUN_ID              - deployment run id (for log correlation)
 #
-# Source: the PUBLIC GitHub repo (CodeBuild clones it — Decision 6), which contains the
+# Source: the PUBLIC GitHub repo (CodeBuild clones it), which contains the
 #   infrastructure/ CDK app. The agent's parameter OVERRIDE is delivered separately via
 #   OVERRIDE_S3_URI (small JSON uploaded by start_deployment). Infra code = GitHub;
 #   per-run config = S3. The two are intentionally separate.
 #
-# SECURITY (Phase 0 only): this build runs under an AdministratorAccess role and the
+# SECURITY (POC only): this build runs under an AdministratorAccess role and the
 #   account is bootstrapped with the default admin CFN execution role. This is a
-#   DELIBERATE deferral — see design/AGENT_DRIVEN_DEPLOYMENT_UX.md §11a. Harden (scoped
-#   policies + permissions boundaries) BEFORE any non-burner / shared / production use.
+#   DELIBERATE deferral for a single-operator sandbox. Harden (scoped policies +
+#   permissions boundaries) BEFORE any shared / production use.
 
 version: 0.2
 

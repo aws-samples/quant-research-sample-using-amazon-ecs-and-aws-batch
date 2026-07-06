@@ -74,6 +74,10 @@ deploy.log
 infrastructure-summary.json
 package-lock.json
 
+# Security scan output (ASH / ProtoShield — local scan artifacts, never committed)
+.ash/
+.protoshield/
+
 # ============================================
 # Configuration
 # ============================================

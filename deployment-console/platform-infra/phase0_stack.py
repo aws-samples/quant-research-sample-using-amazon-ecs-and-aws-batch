@@ -1,25 +1,25 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Phase 0 platform infrastructure — the minimal slice to prove the deploy path.
+"""Platform infrastructure — the minimal slice that runs the deploy path.
 
 Provisions:
   - An S3 bucket for agent-produced parameter overrides + cdk outputs (per run).
   - A CodeBuild project whose source is the PUBLIC GitHub repo (cloned at build time),
-    running `cdk deploy` on infrastructure/ via the VERIFIED injection path
+    running `cdk deploy` on infrastructure/ via the injection path
     (cdk.context.json via merge_params.py). See buildspec.yml.
   - The CodeBuild service role.
 
-POC SIMPLIFICATIONS (colleague feedback — see design Decisions 5-7):
+POC SIMPLIFICATIONS:
   - NO Cognito / auth — single trusted operator.
   - Source = PUBLIC GitHub repo by URL (no S3 artifact, no GitHub token needed for a
     public read-only clone).
   - Observability is PULL: the agent reads status via codebuild:BatchGetBuilds +
     logs:GetLogEvents (see backend/tools/get_status.py). No AppSync/EventBridge/Live Tail.
 
-SECURITY (Phase 0 only): the CodeBuild role is granted AdministratorAccess. DELIBERATE,
-TRACKED deferral — see design §11a. Scope down BEFORE any non-burner / shared / prod use.
+SECURITY (POC only): the CodeBuild role is granted AdministratorAccess. DELIBERATE,
+TRACKED deferral for a single-operator sandbox. Scope down BEFORE any shared / prod use.
 
-Not included in Phase 0 (later phases): Step Functions approval gate, AgentCore, the UI.
+Not included in this POC (possible later work): Step Functions approval gate.
 """
 
 from aws_cdk import (
@@ -39,7 +39,7 @@ import os
 
 
 class Phase0DeploySlice(Stack):
-    # Default infra source: the public aws-samples repo (Decision 6).
+    # Default infra source: the public aws-samples repo.
     DEFAULT_SOURCE_OWNER = "aws-samples"
     DEFAULT_SOURCE_REPO = "quant-research-sample-using-amazon-ecs-and-aws-batch"
 
@@ -68,18 +68,18 @@ class Phase0DeploySlice(Stack):
         )
 
         # --- CodeBuild service role -------------------------------------------------
-        # PHASE 0: AdministratorAccess. Deferred scoping — see module docstring + §11a.
+        # POC: AdministratorAccess. Deferred scoping — see the module docstring.
         self.build_role = iam.Role(
             self, "DeployBuildRole",
             role_name=f"{namespace}-deploy-console-build-role",
             assumed_by=iam.ServicePrincipal("codebuild.amazonaws.com"),
-            description="Phase 0 spike role - ADMIN, scope down before non-burner use (see design section 11a)",
+            description="POC build role - ADMIN, scope down before shared/production use",
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"),
             ],
         )
 
-        # --- Source: PUBLIC GitHub repo, cloned at build time (Decision 6) ----------
+        # --- Source: PUBLIC GitHub repo, cloned at build time -----------------------
         # A public repo needs no GitHub token / CodeConnections for a read-only clone.
         # Owner/repo/branch default to the aws-samples repo and can be overridden so the
         # operator can point at a fork or branch without code changes.

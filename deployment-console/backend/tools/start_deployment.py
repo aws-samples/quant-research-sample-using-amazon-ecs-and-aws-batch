@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: MIT-0
 """start_deployment — the agent tool that triggers a deployment.
 
-Phase 0 scope: validate the agent's override, persist it to S3, and start the CodeBuild
-project that runs `cdk deploy`. Returns a run id the UI/agent can poll.
+Validates the agent's override, persists it to S3, and starts the CodeBuild project that
+runs `cdk deploy`. Returns a run id the UI/agent can poll.
 
 CONTRACT (must hold before this is callable):
   - The override has already been validated by validate_config (schema/validate.py).
     We re-validate here defensively — never trust the caller.
-  - Human approval has occurred upstream (Phase 1 wires the SFN approval gate; in Phase 0
-    approval is implicit / out of band).
+  - Human approval has occurred upstream (in this POC, approval is implicit / out of band;
+    a Step Functions approval gate is possible future work).
 
 Inputs (event):
   {
@@ -67,8 +67,8 @@ def handler(event: dict, _context=None) -> dict:
         return {"ok": False, "run_id": run_id, "errors": errors}
 
     # Defensive re-validation. NOTE: validate() expects a COMPLETE parameters object;
-    # the override is partial, so in Phase 1 we validate the MERGED result. For Phase 0
-    # we validate only if a full object was passed, else defer to the build's merge step.
+    # the override is partial, so we validate only if a full object was passed, else
+    # defer validation to the build's merge step (which produces the complete object).
     if validate is not None and _looks_complete(override):
         report = validate(override, identity)
         if not report.ok:

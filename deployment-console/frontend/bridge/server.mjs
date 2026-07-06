@@ -1,5 +1,5 @@
 // Live bridge — thin Node proxy holding AWS creds (never the browser).
-// See UI_DESIGN_SPEC.md §8. Run: AGENT_RUNTIME_ARN=... node bridge/server.mjs
+// Run: AGENT_RUNTIME_ARN=... node bridge/server.mjs
 // Requires the AWS SDK v3 packages installed in this dir (not bundled with the
 // frontend). This is the documented path to flip Mock → Live once the AgentCore
 // runtime is re-created (it was torn down after validation; rebuild via agent/ +

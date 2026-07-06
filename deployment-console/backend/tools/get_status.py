@@ -2,9 +2,8 @@
 # SPDX-License-Identifier: MIT-0
 """get_status / get_logs — the agent's PULL-based observability tools.
 
-POC observability model (Decision 7, verified in design/AWS_RESEARCH_FINDINGS.md §F):
-the agent reads deployment status DIRECTLY from AWS read APIs when the user asks — no
-push infrastructure (no AppSync, EventBridge, or Live Tail relay).
+POC observability model: the agent reads deployment status DIRECTLY from AWS read APIs
+when the user asks — no push infrastructure (no AppSync, EventBridge, or Live Tail relay).
 
   - codebuild:BatchGetBuilds  -> build status, current phase, phases[], log location
   - logs:GetLogEvents          -> the actual log lines (paginated)

@@ -7,7 +7,7 @@ a valid object that passes here is injected into the CDK app via
 | File | Purpose |
 |---|---|
 | `config.schema.json` | JSON Schema (Draft 2020-12). Structural validation: types, enums, required fields, `additionalProperties:false` (rejects unknown keys, e.g. injected fields). Mirrors `infrastructure/config/parameters.json`. |
-| `validate.py` | Two-layer validator: (1) JSON Schema, (2) cross-field rules JSON Schema can't express — see `../design/CONFIG_SCHEMA_PLAN.md` §4. Returns hard errors (block deploy) + advisory warnings. The `validate_config` agent tool calls this. |
+| `validate.py` | Two-layer validator: (1) JSON Schema, (2) cross-field rules JSON Schema can't express (see "What's enforced where" below). Returns hard errors (block deploy) + advisory warnings. The `validate_config` agent tool calls this. |
 | `requirements.txt` | `jsonschema` (the only dep). |
 
 ## Usage

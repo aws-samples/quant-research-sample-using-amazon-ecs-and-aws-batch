@@ -3,7 +3,7 @@
 """Deep-merge an agent-produced override onto the canonical parameters.json defaults,
 then write the result to infrastructure/cdk.context.json as {"parameters": {...}}.
 
-WHY THIS EXISTS (empirically verified — see design/AWS_RESEARCH_FINDINGS.md §E):
+WHY THIS EXISTS (empirically verified against the real infrastructure/app.py):
   - `cdk -c parameters='{json}'` passes the value as a STRING, which breaks utils.py.
     The only working injection path is a JSON context FILE: cdk.context.json with
     {"parameters": <object>}, which CDK parses into a real dict.
