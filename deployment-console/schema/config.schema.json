@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aws-samples/quant-research-sample/deployment-console/schema/config.schema.json",
+  "title": "Deployment Console — Infrastructure Parameters Contract",
+  "description": "The agent's config contract. A valid 'parameters' object that passes this schema is injected into the CDK app via `cdk deploy -c parameters='<this object>'`. Structural validation only; cross-field rules (conditionals, arithmetic) live in validate.py. Mirrors infrastructure/config/parameters.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "availability_zone",
+    "app_with_codepipeline",
+    "app_with_fsx",
+    "app_with_s3express",
+    "batch",
+    "fsx",
+    "s3"
+  ],
+  "properties": {
+    "availability_zone": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Single-AZ placement. 'id' is the AZ ID (e.g. use1-az4), required when app_with_s3express is true.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "AZ name, e.g. us-east-1a. Must be an AZ in the deployment region.",
+          "pattern": "^[a-z]{2}-[a-z]+-[0-9]+[a-z]$"
+        },
+        "id": {
+          "type": "string",
+          "description": "AZ ID, e.g. use1-az4. Required iff app_with_s3express=true (see validate.py rule 1).",
+          "pattern": "^[a-z0-9]+-az[0-9]+$"
+        }
+      }
+    },
+
+    "app_with_codepipeline": {
+      "type": "boolean",
+      "description": "Toggle: deploy the CodePipeline/CodeBuild CI/CD stack. Requires GitHub identity fields (validate.py rule 8)."
+    },
+    "app_with_fsx": {
+      "type": "boolean",
+      "description": "Toggle: deploy the FSx for Lustre stack (fast scratch, auto-mounted at /fsx)."
+    },
+    "app_with_s3express": {
+      "type": "boolean",
+      "description": "Toggle: deploy an S3 Express One Zone directory bucket. Requires availability_zone.id (validate.py rule 1)."
+    },
+
+    "batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deployment_type"],
+      "properties": {
+        "deployment_type": {
+          "type": "string",
+          "description": "Which compute stacks to deploy. Gates which sub-block is required (validate.py rule 4).",
+          "enum": ["SINGLE_NODE", "MULTI_NODE", "ALL"]
+        },
+        "single_node": { "$ref": "#/$defs/singleNode" },
+        "multi_node": { "$ref": "#/$defs/multiNode" }
+      }
+    },
+
+    "fsx": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Only meaningful when app_with_fsx=true.",
+      "required": ["per_unit_storage_throughput", "storage_capacity_gib", "deployment_type"],
+      "properties": {
+        "per_unit_storage_throughput": {
+          "type": "integer",
+          "description": "MB/s per TiB. AWS minimum 50. Only APPLIED for PERSISTENT_2 (no-op otherwise, validate.py rule 3).",
+          "minimum": 50
+        },
+        "storage_capacity_gib": {
+          "type": "integer",
+          "description": "Filesystem size in GiB. AWS minimum 1200 (mirrors FSxStack._validate_inputs).",
+          "minimum": 1200
+        },
+        "deployment_type": {
+          "type": "string",
+          "description": "FSx Lustre deployment type (CDK fsx.LustreDeploymentType).",
+          "enum": ["SCRATCH_1", "SCRATCH_2", "PERSISTENT_1", "PERSISTENT_2"]
+        }
+      }
+    },
+
+    "s3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_expiration_in_days"],
+      "properties": {
+        "object_expiration_in_days": {
+          "type": "integer",
+          "description": "Lifecycle expiry for the standard bucket.",
+          "minimum": 1
+        },
+        "custom_arns": {
+          "type": "array",
+          "description": "Extra S3 bucket ARNs the Batch job role may read/write. DANGEROUS: grants access to arbitrary buckets — should be an explicit allow-list, never agent-freeform (see security notes in CONFIG_SCHEMA_PLAN.md).",
+          "items": {
+            "type": "string",
+            "pattern": "^arn:aws[a-zA-Z-]*:s3:::[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]/?$"
+          },
+          "default": []
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "instanceClass": {
+      "type": "string",
+      "description": "AWS EC2 instance CLASS (family without size), uppercased as CDK ec2.InstanceClass expects, e.g. C6I, R5, R7I, G5, P4D. Not an exhaustive enum — CDK accepts a large set; pattern guards shape only.",
+      "pattern": "^[A-Z][A-Z0-9]{1,7}$"
+    },
+    "allocationStrategy": {
+      "type": "string",
+      "description": "AWS Batch allocation strategy (CDK batch.AllocationStrategy).",
+      "enum": [
+        "BEST_FIT",
+        "BEST_FIT_PROGRESSIVE",
+        "SPOT_CAPACITY_OPTIMIZED",
+        "SPOT_PRICE_CAPACITY_OPTIMIZED"
+      ]
+    },
+    "containerCommand": {
+      "type": "array",
+      "description": "Container entrypoint command. LOCKED FIELD — agent must NOT set this; if editable it is arbitrary code execution. Enforced in validate.py / tool layer, not structurally.",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+
+    "singleNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "CPU compute env config. Required when batch.deployment_type is SINGLE_NODE or ALL.",
+      "required": ["maxv_cpus", "minv_cpus", "num_queues", "container_cpu", "container_memory", "instance_classes", "allocation_strategy", "spot"],
+      "properties": {
+        "maxv_cpus": {
+          "type": "integer",
+          "description": "Max vCPUs across the compute env. Soft-capped by account quota.",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "minv_cpus": {
+          "type": "integer",
+          "description": "Min vCPUs kept warm. Must be <= maxv_cpus (validate.py rule 5).",
+          "minimum": 0
+        },
+        "num_queues": {
+          "type": "integer",
+          "description": "Number of parallel queues/compute-envs. maxv_cpus is divided across them (floor).",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "container_cpu": {
+          "type": "integer",
+          "description": "vCPUs per job. Must be <= floor(maxv_cpus/num_queues) (validate.py rule 5).",
+          "minimum": 1
+        },
+        "container_memory": {
+          "type": "integer",
+          "description": "MiB per job. Must fit chosen instance classes (validate.py rule 9, advisory).",
+          "minimum": 512
+        },
+        "container_command": { "$ref": "#/$defs/containerCommand" },
+        "instance_classes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/instanceClass" },
+          "minItems": 1
+        },
+        "allocation_strategy": { "$ref": "#/$defs/allocationStrategy" },
+        "spot": { "type": "boolean" }
+      }
+    },
+
+    "multiNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "GPU multi-node config. Required when batch.deployment_type is MULTI_NODE or ALL.",
+      "required": ["maxv_cpus", "minv_cpus", "main", "worker", "instance_classes", "allocation_strategy", "spot"],
+      "properties": {
+        "maxv_cpus": {
+          "type": "integer",
+          "description": "Max vCPUs. Must cover main + workers (validate.py rule 6).",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "minv_cpus": { "type": "integer", "minimum": 0 },
+        "main": { "$ref": "#/$defs/gpuNode" },
+        "worker": { "$ref": "#/$defs/gpuNode" },
+        "instance_classes": {
+          "type": "array",
+          "description": "Must include a GPU-capable family (G/P) if any container_gpu>0 (validate.py rule 6).",
+          "items": { "$ref": "#/$defs/instanceClass" },
+          "minItems": 1
+        },
+        "allocation_strategy": { "$ref": "#/$defs/allocationStrategy" },
+        "spot": { "type": "boolean" }
+      }
+    },
+
+    "gpuNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A node group in the multi-node job (main = node 0, worker = nodes 1..N). Node indices are advanced/topology fields (validate.py rule 7).",
+      "required": ["start_node_index", "end_node_index", "container_cpu", "container_gpu", "container_memory"],
+      "properties": {
+        "start_node_index": { "type": "integer", "minimum": 0 },
+        "end_node_index": { "type": "integer", "minimum": 0 },
+        "container_cpu": { "type": "integer", "minimum": 1 },
+        "container_gpu": { "type": "integer", "minimum": 0 },
+        "container_memory": { "type": "integer", "minimum": 512 },
+        "container_command": { "$ref": "#/$defs/containerCommand" }
+      }
+    }
+  }
+}

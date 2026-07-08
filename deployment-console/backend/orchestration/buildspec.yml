@@ -1,0 +1,80 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# CodeBuild buildspec for the headless deployment slice.
+#
+# Inputs (environment variables, set by the start_deployment Lambda via startBuild):
+#   NAMESPACE           - resource prefix for this deployment (validated S3-safe)
+#   TARGET_ACCOUNT_ID   - AWS account to deploy into (the build runs in this account)
+#   TARGET_REGION       - AWS region
+#   OVERRIDE_S3_URI      - s3:// URI of the agent-produced parameter OVERRIDE (partial)
+#   RUN_ID              - deployment run id (for log correlation)
+#
+# Source: the PUBLIC GitHub repo (CodeBuild clones it), which contains the
+#   infrastructure/ CDK app. The agent's parameter OVERRIDE is delivered separately via
+#   OVERRIDE_S3_URI (small JSON uploaded by start_deployment). Infra code = GitHub;
+#   per-run config = S3. The two are intentionally separate.
+#
+# SECURITY (POC only): this build runs under an AdministratorAccess role and the
+#   account is bootstrapped with the default admin CFN execution role. This is a
+#   DELIBERATE deferral for a single-operator sandbox. Harden (scoped policies +
+#   permissions boundaries) BEFORE any shared / production use.
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+      nodejs: 22
+    commands:
+      - echo "Installing AWS CDK CLI..."
+      - npm install -g aws-cdk@2
+      - cdk --version
+      - python --version
+
+  pre_build:
+    commands:
+      - echo "RUN_ID=$RUN_ID NAMESPACE=$NAMESPACE TARGET=$TARGET_ACCOUNT_ID/$TARGET_REGION"
+      - cd infrastructure
+      - python -m pip install --upgrade pip
+      - pip install -r requirements.txt
+      # Fetch the agent-produced partial override from S3
+      - aws s3 cp "$OVERRIDE_S3_URI" /tmp/override.json
+      - cat /tmp/override.json
+      # Deep-merge override onto canonical defaults -> cdk.context.json (VERIFIED injection path)
+      - |
+        python ../deployment-console/backend/orchestration/merge_params.py \
+          --defaults config/parameters.json \
+          --override /tmp/override.json \
+          --out cdk.context.json
+      - echo "Effective cdk.context.json:" && cat cdk.context.json
+
+  build:
+    commands:
+      - cd infrastructure
+      - export AWS_ACCOUNT_ID=$TARGET_ACCOUNT_ID
+      - export AWS_REGION=$TARGET_REGION
+      - export CDK_DEFAULT_ACCOUNT=$TARGET_ACCOUNT_ID
+      - export CDK_DEFAULT_REGION=$TARGET_REGION
+      # List then deploy. --require-approval never: no interactive IAM prompt in CI.
+      - echo "Stacks to deploy:" && cdk list
+      - cdk deploy --all --require-approval never --outputs-file /tmp/cdk-outputs.json
+
+  post_build:
+    commands:
+      - echo "Deploy finished with status $CODEBUILD_BUILD_SUCCEEDING"
+      - cat /tmp/cdk-outputs.json 2>/dev/null || echo "(no outputs file)"
+      # Persist outputs for the get_resources tool / Components tab
+      - |
+        if [ -f /tmp/cdk-outputs.json ] && [ -n "$OVERRIDE_S3_URI" ]; then
+          OUT_URI="$(dirname "$OVERRIDE_S3_URI")/outputs-$RUN_ID.json"
+          aws s3 cp /tmp/cdk-outputs.json "$OUT_URI" || true
+          echo "Outputs saved to $OUT_URI"
+        fi
+
+artifacts:
+  files:
+    - infrastructure/cdk.context.json
+    - infrastructure/cdk.out/**/*
+  name: cdk-deploy-$RUN_ID

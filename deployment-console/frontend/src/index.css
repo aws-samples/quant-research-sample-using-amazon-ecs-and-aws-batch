@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* ============================================================
+   AWS theme tokens — dark default.
+   Exposed to Tailwind v4 utilities (e.g. text-aws-orange, bg-squid).
+   ============================================================ */
+@theme {
+  --color-anchor: #161e2d;
+  --color-squid: #232f3e;
+  --color-aws-orange: #ff9900;
+  --color-aws-orange-2: #ec7211;
+  --color-aws-blue: #0972d3;
+  --color-aws-teal: #01a88d;
+  --color-aws-green: #2bc253;
+  --color-aws-red: #d13212;
+  --color-aws-slate: #5f6b7a;
+
+  --color-surface-0: #0f1b2d;
+  --color-surface-1: #16233a;
+  --color-surface-2: #1d2c47;
+  --color-text-hi: #f4f7fb;
+  --color-text-mid: #aab6c6;
+  --color-text-lo: #6b7889;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+:root {
+  --border-soft: rgba(255, 255, 255, 0.08);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text-hi);
+  background: var(--color-surface-0);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Reduced-motion safety net (components also branch on the hook). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 153, 0, 0.45);
+}

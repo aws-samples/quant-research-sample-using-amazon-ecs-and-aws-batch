@@ -155,11 +155,16 @@ class S3Stack(Stack):
 
         bucket_type = bucket_type.lower()
 
-        # Define the static parts of the bucket name
+        # Define the static parts of the bucket name.
+        # The standard bucket name is scoped by account AND region so it is globally
+        # unique per account — S3 bucket names share one global namespace, and a name
+        # derived from only namespace+region collides across accounts (and now fails
+        # CloudFormation's NAME_CONFLICT early-validation). The express (directory)
+        # bucket already carries the AZ id and follows its own naming rules.
         # Refer directory bucket naming rules - https://docs.aws.amazon.com/AmazonS3/latest/userguide/directory-bucket-naming-rules.html
         suffixes = {
             "express": f"-express-bucket--{self.availability_zone_id}--x-s3",
-            "standard": f"-standard-bucket-{self.region}",
+            "standard": f"-standard-bucket-{self.account}-{self.region}",
         }
 
         if bucket_type not in suffixes:
