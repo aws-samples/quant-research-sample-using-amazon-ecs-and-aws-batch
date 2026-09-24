@@ -1,6 +1,8 @@
 """Worker resume + end-to-end shard processing against moto S3 and a local
 aiohttp test server."""
 
+import html
+
 import boto3
 import polars as pl
 import pytest
@@ -58,7 +60,7 @@ async def server(aiohttp_server):
         if event == "13":
             return web.Response(status=404)
         return web.Response(
-            body=f"<html><body><p>Earnings for event {event}: revenue "
+            body=f"<html><body><p>Earnings for event {html.escape(event)}: revenue "
                  f"grew strongly this quarter.</p></body></html>".encode(),
             content_type="text/html")
 

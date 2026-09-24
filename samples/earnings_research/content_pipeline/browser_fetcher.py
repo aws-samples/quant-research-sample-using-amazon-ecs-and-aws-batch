@@ -61,7 +61,8 @@ class BrowserFetcher:
     async def fetch(self, url: str) -> BrowserResult:
         res = await self._attempt(url, referer=None)
         # q4cdn hotlink protection: retry with the tenant IR origin as referer
-        if (res.status == "blocked" and "q4cdn.com" in (urlsplit(url).hostname or "")):
+        host = (urlsplit(url).hostname or "").lower()
+        if res.status == "blocked" and (host == "q4cdn.com" or host.endswith(".q4cdn.com")):
             res2 = await self._attempt(url, referer=self._guess_referer(url))
             if res2.status == "ok":
                 return res2

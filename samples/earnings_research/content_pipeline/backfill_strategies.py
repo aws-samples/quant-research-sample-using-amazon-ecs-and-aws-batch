@@ -52,6 +52,11 @@ def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").lower()
 
 
+def _on_domain(host: str, domain: str) -> bool:
+    """host is domain or a subdomain of it (a substring test would accept bseindia.com.evil.net)."""
+    return host == domain or host.endswith("." + domain)
+
+
 def classify(region: Optional[str], fetch_status: str, url_pr: str) -> str:
     if fetch_status == "ok":
         return STRATEGY_SKIP
@@ -61,7 +66,7 @@ def classify(region: Optional[str], fetch_status: str, url_pr: str) -> str:
         return STRATEGY_SKIP
 
     # BSE India historical-archive rewrite — cheap, no browser.
-    if "bseindia.com" in host and "/AttachLive/" in url_pr:
+    if _on_domain(host, "bseindia.com") and "/AttachLive/" in url_pr:
         return STRATEGY_REWRITE
 
     # DNS failures: the host itself doesn't resolve — nothing to fetch.

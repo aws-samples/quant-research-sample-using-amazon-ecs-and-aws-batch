@@ -49,3 +49,8 @@ class TestRewriteUrl:
 
     def test_noop_when_absent(self):
         assert rewrite_url("https://example.com/x.pdf") == "https://example.com/x.pdf"
+
+
+def test_rewrite_requires_the_real_bseindia_domain():
+    assert classify("IN", "http_404", "https://www.bseindia.com/xml-data/corpfiling/AttachLive/x.pdf") == STRATEGY_REWRITE
+    assert classify("IN", "http_404", "https://bseindia.com.evil.example/AttachLive/x.pdf") != STRATEGY_REWRITE
