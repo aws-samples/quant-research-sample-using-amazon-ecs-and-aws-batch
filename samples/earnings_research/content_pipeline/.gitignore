@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+cdk/node_modules/
+cdk/cdk.out/
+cdk/outputs.json
+cdk/cdk.context.json

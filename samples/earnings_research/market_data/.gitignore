@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+cdk/node_modules/
+cdk/cdk.out/
+cdk/outputs.json
+cdk/cdk.context.json

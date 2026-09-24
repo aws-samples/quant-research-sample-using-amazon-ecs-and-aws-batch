@@ -1,0 +1,49 @@
+{
+  "_doc": "Account-specific values for every package in this sample. Each package reads this file through its settings.py (found one directory above the package); nothing else in the code names an account, bucket, queue or secret. Replace every <placeholder>; a placeholder that is still in place fails loudly at the first AWS call that needs it.",
+  "aws": {
+    "_doc": "region for every AWS client; profile for local runs (null = default credential chain, always null inside containers); account_id only for composing ECR URIs.",
+    "region": "us-east-1",
+    "profile": null,
+    "account_id": "<your-12-digit-account-id>"
+  },
+  "s3": {
+    "_doc": "data_bucket holds minute panels, peers, constituent snapshots, press releases and every study result; diagnostics_bucket holds event universes and ad-hoc diagnostics (may be the same bucket).",
+    "data_bucket": "<your-data-bucket>",
+    "diagnostics_bucket": "<your-diagnostics-bucket>"
+  },
+  "redshift": {
+    "_doc": "Redshift Serverless workgroup carrying the FactSet corporate-events datashare (AWS Data Exchange), queried through the redshift-data API with a Secrets Manager admin secret.",
+    "workgroup": "<your-redshift-workgroup>",
+    "database": "dev",
+    "secret_arn": "<arn:aws:secretsmanager:...:secret:your-redshift-admin-secret>"
+  },
+  "secrets": {
+    "_doc": "Secrets Manager secret names for the market-data vendor API keys (alpaca: JSON {key_id, secret_key}; databento: JSON {api_key}).",
+    "alpaca": "<your-alpaca-secret-name>",
+    "databento": "<your-databento-secret-name>"
+  },
+  "batch": {
+    "_doc": "job_queue: the shared CPU queue for evaluation arrays; alpaca_job_queue: a queue capped at ~24 vCPUs so Alpaca rate limits hold; compute_environment: only used by the hand-provisioning infra scripts; job_definitions: one per package, provisioned by the infrastructure stack.",
+    "job_queue": "<your-batch-job-queue>",
+    "alpaca_job_queue": "<your-capped-batch-job-queue>",
+    "compute_environment": "<your-batch-compute-environment>",
+    "job_definitions": {
+      "basket_study": "<job-definition-for-basket_study>",
+      "market_data": "<job-definition-for-market_data>",
+      "sentiment_analysis": "<job-definition-for-sentiment_analysis>",
+      "content_pipeline": "<job-definition-for-content_pipeline>"
+    }
+  },
+  "contact_email": "<you@example.com>",
+  "paths": {
+    "_doc": "constituent_cache_dir: where the index-constituent fetch scripts keep their per-index cache manifests, relative to this file.",
+    "constituent_cache_dir": "index_constituents/cache"
+  },
+  "codebuild": {
+    "_doc": "CodeBuild projects that build each package's container image from the source zip (used by the internal packaging scripts only).",
+    "image_build_projects": {
+      "basket_study": "<codebuild-project-for-basket_study-image>",
+      "sentiment_analysis": "<codebuild-project-for-sentiment_analysis-image>"
+    }
+  }
+}
