@@ -1,0 +1,39 @@
+{
+  "job_name": "er-full",
+  "aws": {
+    "region": "us-east-1",
+    "profile": null
+  },
+  "s3": {
+    "bucket": null,
+    "prefix": "earnings-content"
+  },
+  "redshift": {
+    "workgroup": null,
+    "database": "dev",
+    "secret_arn": null,
+    "query_timeout_s": 1800,
+    "row_limit": null
+  },
+  "manifest": {
+    "num_shards": 200
+  },
+  "fetch": {
+    "worker_concurrency": 32,
+    "per_domain_rps": 2.0,
+    "per_domain_burst": 2,
+    "domain_cooldown_s": 60.0,
+    "connect_timeout_s": 10,
+    "total_timeout_s": 60,
+    "max_redirects": 10,
+    "max_body_bytes": 52428800,
+    "max_attempts": 3,
+    "backoff_base_s": 2.0,
+    "user_agent": "quant-research-earnings-pipeline/1.0",
+    "tls_insecure_fallback": true,
+    "retry_statuses_on_resume": [],
+    "checkpoint_every_rows": 500,
+    "checkpoint_every_s": 300,
+    "extract_threads": 4
+  }
+}

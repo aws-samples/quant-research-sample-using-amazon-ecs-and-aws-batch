@@ -1,0 +1,83 @@
+{
+  "_doc": "Single config for the basket study: evaluation (panel source) AND aggregation (cap, chart scopes). Adding an index filter = add an entry to index_scopes and (if needed) its S3 prefix to index_prefixes. No code changes.",
+
+  "evaluation": {
+    "panel_sources": {
+      "alpaca": "earnings-market-data/ALPACA.SIP/panels/",
+      "databento": "earnings-market-data/XNAS.BASIC/panels/"
+    },
+    "default_source": "databento"
+  },
+
+  "aggregation": {
+    "max_basket_weight": 0.02,
+
+    "index_prefixes": {
+      "NDX": "nasdaq-constituents/",
+      "SPX": "sp500-constituents/",
+      "RUI": "russell-1000-constituents/",
+      "RUT": "russell-2000-constituents/",
+      "RUA": "russell-3000-constituents/",
+      "SPTM": "etf-constituents/fund=SPTM/",
+      "XLC": "etf-constituents/fund=XLC/",
+      "XLY": "etf-constituents/fund=XLY/",
+      "XLP": "etf-constituents/fund=XLP/",
+      "XLE": "etf-constituents/fund=XLE/",
+      "XLF": "etf-constituents/fund=XLF/",
+      "XLV": "etf-constituents/fund=XLV/",
+      "XLI": "etf-constituents/fund=XLI/",
+      "XLB": "etf-constituents/fund=XLB/",
+      "XLRE": "etf-constituents/fund=XLRE/",
+      "XLK": "etf-constituents/fund=XLK/",
+      "XLU": "etf-constituents/fund=XLU/"
+    },
+
+    "_doc_scopes": "Ordered lists. tier scopes filter liquidity_tier; index scopes filter reporter membership (list = OR/union). exit_matrix_rows draw top-to-bottom; cell_matrices each produce cell_matrix_<key>.png.",
+
+    "exit_matrix_rows": [
+      {"key": "micro",     "label": "MICRO",     "tiers": ["micro"]},
+      {"key": "small",     "label": "SMALL",     "tiers": ["small"]},
+      {"key": "mid",       "label": "MID",       "tiers": ["mid"]},
+      {"key": "large",     "label": "LARGE",     "tiers": ["large"]},
+      {"key": "all",       "label": "ALL",       "tiers": null},
+      {"key": "exmicro",   "label": "EX-MICRO",  "tiers": ["small", "mid", "large"]},
+      {"key": "midsmall",  "label": "MID+SMALL", "tiers": ["mid", "small"]},
+      {"key": "midlarge",  "label": "MID+LARGE", "tiers": ["mid", "large"]},
+      {"key": "ndx",       "label": "NDX",       "indices": ["NDX"]},
+      {"key": "spx",       "label": "SPX",       "indices": ["SPX"]},
+      {"key": "ndxspx",    "label": "NDX+SPX",   "indices": ["NDX", "SPX"]},
+      {"key": "rui",       "label": "R1000",     "indices": ["RUI"]},
+      {"key": "rut",       "label": "R2000",     "indices": ["RUT"]},
+      {"key": "rua",       "label": "R3000",     "indices": ["RUA"]},
+      {"key": "sptm",      "label": "SP1500",    "indices": ["SPTM"]},
+      {"key": "sec7",      "label": "SEC-7",     "indices": ["XLF", "XLK", "XLU", "XLC", "XLI", "XLY", "XLP"]}
+    ],
+
+    "cell_matrices": [
+      {"key": "midlarge", "title": "MID+LARGE",              "tiers": ["mid", "large"]},
+      {"key": "midsmall", "title": "MID+SMALL",              "tiers": ["mid", "small"]},
+      {"key": "mid",      "title": "MID",                    "tiers": ["mid"]},
+      {"key": "large",    "title": "LARGE",                  "tiers": ["large"]},
+      {"key": "ndx",      "title": "Nasdaq-100",             "indices": ["NDX"]},
+      {"key": "spx",      "title": "S&P 500",                "indices": ["SPX"]},
+      {"key": "ndxspx",   "title": "NDX+SPX (index members)", "indices": ["NDX", "SPX"]},
+      {"key": "rui",      "title": "Russell 1000",           "indices": ["RUI"]},
+      {"key": "rut",      "title": "Russell 2000",           "indices": ["RUT"]},
+      {"key": "rua",      "title": "Russell 3000",           "indices": ["RUA"]},
+      {"key": "sptm",     "title": "S&P 1500 (SPTM)",        "indices": ["SPTM"]},
+      {"key": "xlk",      "title": "Sector: Technology (XLK)",             "indices": ["XLK"]},
+      {"key": "xlf",      "title": "Sector: Financials (XLF)",             "indices": ["XLF"]},
+      {"key": "xlv",      "title": "Sector: Health Care (XLV)",            "indices": ["XLV"]},
+      {"key": "xly",      "title": "Sector: Consumer Discretionary (XLY)", "indices": ["XLY"]},
+      {"key": "xlp",      "title": "Sector: Consumer Staples (XLP)",       "indices": ["XLP"]},
+      {"key": "xli",      "title": "Sector: Industrials (XLI)",            "indices": ["XLI"]},
+      {"key": "xle",      "title": "Sector: Energy (XLE)",                 "indices": ["XLE"]},
+      {"key": "xlb",      "title": "Sector: Materials (XLB)",              "indices": ["XLB"]},
+      {"key": "xlc",      "title": "Sector: Communications (XLC)",         "indices": ["XLC"]},
+      {"key": "xlre",     "title": "Sector: Real Estate (XLRE)",           "indices": ["XLRE"]},
+      {"key": "xlu",      "title": "Sector: Utilities (XLU)",              "indices": ["XLU"]},
+      {"key": "sec7",     "title": "SEC-7 (XLF+XLK+XLU+XLC+XLI+XLY+XLP — consistent sectors)",
+       "indices": ["XLF", "XLK", "XLU", "XLC", "XLI", "XLY", "XLP"]}
+    ]
+  }
+}

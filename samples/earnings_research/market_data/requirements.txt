@@ -1,0 +1,10 @@
+# AWS access
+boto3>=1.34.0
+
+# Trading-day calendar for the date fan-out
+pandas>=2.0.0
+pandas_market_calendars>=4.4.0
+
+# Databento HTTP client + parquet output
+requests>=2.31.0
+pyarrow>=15.0.0

@@ -1,0 +1,33 @@
+{
+  "job_name": "er-backfill",
+  "aws": {
+    "region": "us-east-1",
+    "profile": null
+  },
+  "s3": {
+    "bucket": null,
+    "prefix": "earnings-content"
+  },
+  "manifest": {
+    "num_shards": 20
+  },
+  "fetch": {
+    "worker_concurrency": 4,
+    "per_domain_rps": 0.5,
+    "per_domain_burst": 1,
+    "domain_cooldown_s": 60.0,
+    "connect_timeout_s": 15,
+    "total_timeout_s": 60,
+    "max_redirects": 10,
+    "max_body_bytes": 52428800,
+    "max_attempts": 3,
+    "backoff_base_s": 2.0,
+    "user_agent": "quant-research-earnings-pipeline/1.0",
+    "tls_insecure_fallback": true,
+    "retry_statuses_on_resume": [],
+    "checkpoint_every_rows": 100,
+    "checkpoint_every_s": 300,
+    "checkpoint_every_bytes": 268435456,
+    "extract_threads": 2
+  }
+}
