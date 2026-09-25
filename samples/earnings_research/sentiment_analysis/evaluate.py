@@ -133,7 +133,7 @@ import settings  # noqa: E402
 
 def _bucket() -> str:
     return settings.get("s3", "data_bucket")
-# Batch target: settings batch.job_queue / batch.job_definitions.sentiment_analysis.
+# Batch target: settings batch.job_queue / batch.job_definition (shared by all packages).
 
 
 def _code_version() -> str:
@@ -147,9 +147,10 @@ def _git_code_version() -> str:
     dirty = subprocess.run(["git", "-C", str(root), "status", "--porcelain",
                             "--", str(root)], capture_output=True, text=True).stdout.strip()
     if dirty:
-        raise SystemExit("FATAL: uncommitted changes under earnings_sentiment_analysis/")
-    return subprocess.run(["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
-                          capture_output=True, text=True, check=True).stdout.strip()
+        raise SystemExit("FATAL: uncommitted changes under sentiment_analysis/")
+    # first 12 characters of the full SHA, exactly what the image build bakes
+    return subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()[:12]
 
 
 def _session(profile):
@@ -227,9 +228,10 @@ def cmd_plan(args) -> int:
         batch = session.client("batch", region_name=settings.get("aws", "region"))
         resp = batch.submit_job(
             jobName=f"esa-{st.key}-{args.arm}-{size}{tag}", jobQueue=settings.get("batch", "job_queue"),
-            jobDefinition=settings.get("batch", "job_definitions", "sentiment_analysis"),
+            jobDefinition=settings.get("batch", "job_definition"),
             arrayProperties={"size": size} if size > 1 else {},
-            containerOverrides={"command": ["eval-child", "--manifest", mk]},
+            containerOverrides=settings.job_overrides(
+                "sentiment_analysis", ["eval-child", "--manifest", mk]),
             timeout={"attemptDurationSeconds": 43200})
         out.update(submitted=True, job_id=resp["jobId"])
     print(json.dumps(out, indent=2))

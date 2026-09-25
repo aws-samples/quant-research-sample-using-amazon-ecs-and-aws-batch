@@ -113,3 +113,22 @@ def sibling(name: str) -> Path:
     if _path is not None and _path.name == INTERNAL_CONFIG:
         return base / _INTERNAL_LAYOUT[name]
     return base / name
+
+
+def job_overrides(package: str, command: list) -> dict:
+    """containerOverrides for the ONE job definition every package shares.
+
+    The image's dispatcher runs `<package> <command...>`; vCPU/memory come from
+    batch.resources["<package>:<command[0]>"], else batch.resources["<package>"],
+    else the job definition's defaults apply.
+    """
+    command = [str(c) for c in command]
+    overrides: dict = {"command": [package, *command]}
+    resources = (_load().get("batch") or {}).get("resources") or {}
+    size = (resources.get(f"{package}:{command[0]}") if command else None) \
+        or resources.get(package)
+    if size:
+        overrides["resourceRequirements"] = [
+            {"type": "VCPU", "value": str(size["vcpus"])},
+            {"type": "MEMORY", "value": str(size["memory_mib"])}]
+    return overrides

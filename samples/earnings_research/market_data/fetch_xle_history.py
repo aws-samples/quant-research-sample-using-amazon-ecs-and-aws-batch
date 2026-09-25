@@ -41,7 +41,7 @@ def _bucket() -> str:
 OUT_PREFIX = "earnings-market-data/XLE_HISTORY"
 
 # Batch target: settings batch.alpaca_job_queue (capped so Alpaca rate limits hold)
-# and batch.job_definitions.market_data.
+# and batch.job_definition (shared by all packages).
 
 
 def fetch_ticker_history(ticker: str, start: str, end: str, client: AlpacaClient, s3_client) -> dict:
@@ -118,15 +118,15 @@ def submit_batch_jobs(tickers: list[str], start: str, end: str, profile: str = N
             resp = batch.submit_job(
                 jobName=job_name,
                 jobQueue=settings.get("batch", "alpaca_job_queue"),
-                jobDefinition=settings.get("batch", "job_definitions", "market_data"),
-                containerOverrides={
-                    "command": [
-                        "python", "fetch_xle_history.py",
+                jobDefinition=settings.get("batch", "job_definition"),
+                containerOverrides=settings.job_overrides(
+                    "market_data", [
+                        "fetch_xle_history.py",
                         "--ticker", ticker,
                         "--start", start,
                         "--end", end
                     ]
-                }
+                )
             )
             job_id = resp["jobId"]
             job_ids.append(job_id)

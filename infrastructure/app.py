@@ -4,6 +4,8 @@
 from aws_cdk import App, Environment, aws_ec2 as ec2
 
 from batch.base_construct import S3BucketArnConfig, BatchJobDeploymentType
+from batch.cpu_queues import CpuQueueSpec
+from batch.earnings_research import EarningsResearchConfig, EarningsResearchStack
 from batch.multi_node_with_gpu import (
     BatchJobConfigForMultiNodeWithGPU,
     BatchJobConfigForNodeWithGPU,
@@ -15,7 +17,7 @@ from batch.single_node_with_cpu import (
 )
 from common.fsx import FSxStack
 from common.network import NetworkStack
-from common.pipeline import PipelineConfig, DeploymentPipelineStack
+from common.pipeline import ImageBuildSpec, PipelineConfig, DeploymentPipelineStack
 from common.s3 import S3Stack
 from utils import get_stack_name, EnvironmentConfig, load_parameters
 
@@ -29,6 +31,7 @@ app = App()
 
 # Load default parameters from file
 params = load_parameters(app)
+with_earnings_research = getattr(params, "app_with_earnings_research", False)
 
 # Build the networking stack
 network = NetworkStack(
@@ -39,6 +42,10 @@ network = NetworkStack(
     namespace=namespace,
     availability_zone=params.availability_zone.name,
     with_s3express=params.app_with_s3express,
+    # NAT egress is only needed by the earnings research jobs (vendor APIs, web fetches)
+    nat_gateways=(
+        params.earnings_research.nat_gateways if with_earnings_research else 0
+    ),
 )
 
 # Build the S3 storage stack
@@ -84,6 +91,14 @@ if params.app_with_fsx:
     )
 
 # Build the deployment pipeline
+image_builds = [
+    ImageBuildSpec.from_params(b) for b in getattr(params, "image_builds", [])
+]
+if with_earnings_research:
+    image_builds.append(
+        ImageBuildSpec.from_params(params.earnings_research.image_build)
+    )
+
 pipeline_config = PipelineConfig(
     namespace=namespace,
     github_owner=env_config.github_owner,
@@ -91,6 +106,8 @@ pipeline_config = PipelineConfig(
     github_branch=env_config.github_branch,
     github_token_secret_name=env_config.github_token,
     enable_code_pipeline=params.app_with_codepipeline,
+    image_builds=image_builds,
+    register_github_credentials=getattr(params, "register_github_credentials", True),
 )
 
 deployment_pipeline = DeploymentPipelineStack(
@@ -196,6 +213,43 @@ def deploy_multi_node_with_gpu():
     )
 
 
+def deploy_earnings_research():
+    """
+    Deploy the job queues listed in batch.queues and the job definition of
+    samples/earnings_research
+    """
+    earnings_config = EarningsResearchConfig(
+        namespace=namespace,
+        vpc=network.vpc,
+        security_group=network.security_group,
+        s3_bucket_config=S3BucketArnConfig(
+            s3_standard_bucket_arn=s3_storage.standard_bucket.bucket_arn,
+            s3_express_bucket_arn=(
+                s3_storage.express_bucket.attr_arn
+                if params.app_with_s3express
+                else None
+            ),
+            custom_s3_arns=params.s3.custom_arns,
+        ),
+        image_repository=deployment_pipeline.image_repos[
+            params.earnings_research.image_build.id
+        ],
+        queues=[CpuQueueSpec.from_params(q) for q in params.batch.queues],
+        job_definition_name=params.earnings_research.job_definition_name,
+        secret_names=params.earnings_research.secret_names,
+        bedrock_model_patterns=params.earnings_research.bedrock_model_patterns,
+        container_cpu=params.earnings_research.container_cpu,
+        container_memory=params.earnings_research.container_memory,
+    )
+    EarningsResearchStack(
+        app,
+        get_stack_name(namespace=namespace, prefix="batch-earnings-research-stack-"),
+        env=env,
+        description=f"Earnings research job queues and job definition for the {namespace}",
+        config=earnings_config,
+    )
+
+
 # Validate and initiate the Batch deployment
 batch_deployment_type = params.batch.deployment_type
 
@@ -206,5 +260,8 @@ elif batch_deployment_type == BatchJobDeploymentType.MULTI_NODE:
 else:  # ALL
     deploy_single_node_with_cpu()
     deploy_multi_node_with_gpu()
+
+if with_earnings_research:
+    deploy_earnings_research()
 
 app.synth()

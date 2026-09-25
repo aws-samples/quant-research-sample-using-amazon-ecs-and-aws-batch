@@ -58,7 +58,8 @@ PANEL_PREFIXES = _EVAL_CFG["panel_sources"]
 PANEL_PREFIX = PANEL_PREFIXES[_EVAL_CFG["default_source"]]   # --source overrides
 UNIVERSES = ["all", "pure play", "functional", "correlated"]
 # Batch target for the array job `plan` submits: settings batch.job_queue and
-# batch.job_definitions.basket_study (job definition owned by the infrastructure stack).
+# batch.job_definition (the one job definition owned by the infrastructure stack);
+# containerOverrides from settings.job_overrides (dispatcher command + batch.resources).
 
 # Sentiment study configuration (Task 6)
 BANDS = [2, 3, 4, 5]
@@ -128,7 +129,7 @@ SENTIMENT_DTYPES = {"sentiment_model": "string", "sentiment_score": "Float64",
 
 
 def _code_version() -> str:
-    """Git SHA written into the image at zip-packaging time; 'dev' locally.
+    """Git SHA (12 chars) written into the image by the image build; 'dev' locally.
 
     CHILD side of the spec §5 gate. Reads the baked file only — never git —
     so the value is whatever the image was built from.
@@ -140,18 +141,20 @@ def _code_version() -> str:
 def _git_code_version() -> str:
     """PLAN side of the spec §5 gate: the CURRENT git SHA of the working tree.
 
-    Must NOT read CODE_VERSION — that file is what package_source.sh baked
+    Must NOT read CODE_VERSION — that file is what the image build baked
     into the image, so comparing it against itself is a tautology and a
     stale image would sail through the child's assertion. Aborts when
-    earnings_basket_study/ is dirty: a dirty tree has no SHA that can
+    basket_study/ is dirty: a dirty tree has no SHA that can
     honestly describe the code the children would run.
     """
     import subprocess
     root = Path(__file__).resolve().parent.parent
     try:
-        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+        # first 12 characters of the full SHA, exactly what the image build
+        # bakes (`--short` length varies with the clone's object count)
+        sha = subprocess.run(["git", "rev-parse", "HEAD"],
                              cwd=root, capture_output=True, text=True,
-                             check=True).stdout.strip()
+                             check=True).stdout.strip()[:12]
     except (OSError, subprocess.CalledProcessError) as e:
         raise SystemExit(f"FATAL: cannot determine git SHA for the manifest: {e}")
     # against HEAD, not the index: a staged-but-uncommitted change is just as
@@ -160,9 +163,9 @@ def _git_code_version() -> str:
                             str(Path(__file__).resolve().parent)], cwd=root)
     if dirty.returncode != 0:
         raise SystemExit(
-            "FATAL: uncommitted changes under earnings_basket_study/ — commit "
-            "them, re-run package_source.sh, and wait for the image build "
-            "before planning (spec §5 code-version gate)")
+            "FATAL: uncommitted changes under basket_study/ — commit and "
+            "push them, and wait for the image build before planning "
+            "(spec §5 code-version gate)")
     if not sha:
         raise SystemExit("FATAL: empty git SHA for the manifest")
     return sha
@@ -456,9 +459,10 @@ def cmd_plan(args) -> int:
         resp = batch.submit_job(
             jobName=f"basket-study-eval-{len(chunk)}",
             jobQueue=settings.get("batch", "job_queue"),
-            jobDefinition=settings.get("batch", "job_definitions", "basket_study"),
+            jobDefinition=settings.get("batch", "job_definition"),
             arrayProperties={"size": len(chunk)},
-            containerOverrides={"command": ["eval-event", "--manifest", mk]},
+            containerOverrides=settings.job_overrides(
+                "basket_study", ["eval-event", "--manifest", mk]),
         )
         eval_job_ids.append(resp["jobId"])
     out = {"manifests": manifest_keys, "event_count": n, "submitted": True,
@@ -475,30 +479,26 @@ def cmd_plan(args) -> int:
         lev = getattr(args, "strategy_leverage", 1.0) or 1.0
         agg_cmd_extra = (["--spy-weight", str(spy_w)] if spy_w else []) + \
                         (["--strategy-leverage", str(lev)] if lev != 1 else [])
-        # >100k-shard aggregations OOM at the job def's 4GB (learned on the
-        # 10y run, 2026-08-25) — override to 16GB/2vCPU unconditionally.
-        agg_resources = [{"type": "MEMORY", "value": "16384"},
-                         {"type": "VCPU", "value": "2"}]
+        # >100k-shard aggregations OOM at 4GB: config batch.resources
+        # "basket_study:aggregate" sizes both aggregation jobs (16GB/2vCPU).
         agg = batch.submit_job(
             jobName=f"basket-study-agg-marks-{n_exits}",
             jobQueue=settings.get("batch", "job_queue"),
-            jobDefinition=settings.get("batch", "job_definitions", "basket_study"),
+            jobDefinition=settings.get("batch", "job_definition"),
             dependsOn=[{"jobId": j} for j in eval_job_ids],
             arrayProperties={"size": n_exits},
-            containerOverrides={"command": ["aggregate", "--mark", "auto",
-                                            "--s3-prefix", args.s3_prefix]
-                                            + agg_cmd_extra,
-                                "resourceRequirements": agg_resources},
+            containerOverrides=settings.job_overrides(
+                "basket_study", ["aggregate", "--mark", "auto",
+                                 "--s3-prefix", args.s3_prefix] + agg_cmd_extra),
         )
         fin = batch.submit_job(
             jobName="basket-study-agg-finalize",
             jobQueue=settings.get("batch", "job_queue"),
-            jobDefinition=settings.get("batch", "job_definitions", "basket_study"),
+            jobDefinition=settings.get("batch", "job_definition"),
             dependsOn=[{"jobId": agg["jobId"]}],
-            containerOverrides={"command": ["aggregate", "--finalize",
-                                            "--s3-prefix", args.s3_prefix]
-                                            + agg_cmd_extra,
-                                "resourceRequirements": agg_resources},
+            containerOverrides=settings.job_overrides(
+                "basket_study", ["aggregate", "--finalize",
+                                 "--s3-prefix", args.s3_prefix] + agg_cmd_extra),
         )
         out["aggregate_marks_job_id"] = agg["jobId"]
         out["aggregate_finalize_job_id"] = fin["jobId"]
@@ -593,9 +593,10 @@ def cmd_plan_sentiment(args) -> int:
     batch = session.client("batch", region_name=settings.get("aws", "region"))
     resp = batch.submit_job(
         jobName=f"basket-sentiment-eval-{size}",
-        jobQueue=settings.get("batch", "job_queue"), jobDefinition=settings.get("batch", "job_definitions", "basket_study"),
+        jobQueue=settings.get("batch", "job_queue"), jobDefinition=settings.get("batch", "job_definition"),
         arrayProperties={"size": size} if size > 1 else {},
-        containerOverrides={"command": ["eval-model", "--manifest", mk]},
+        containerOverrides=settings.job_overrides(
+            "basket_study", ["eval-model", "--manifest", mk]),
     )
     print(json.dumps({"manifest": mk, "array_size": size,
                       "code_version": code_version, "n_panels": len(keys),
