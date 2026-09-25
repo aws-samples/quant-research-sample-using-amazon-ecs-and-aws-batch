@@ -7,6 +7,7 @@
   "app_with_fsx": false,
   "app_with_s3express": false,
   "app_with_earnings_research": false,
+  "app_with_gpu_fleet": false,
   "batch": {
     "deployment_type": "ALL",
     "single_node": {
@@ -90,6 +91,69 @@
   },
   "image_builds": [],
   "register_github_credentials": true,
+  "gpu_fleet": {
+    "_doc": "GPU fine-tuning fleet (infrastructure/gpu_fleet). The catalogue of GPU types, launch templates, disks and images is fixed in gpu_fleet/catalogue.py; a preset only selects families, types and regions. Every P-family queue is spot. Refresh where types are sold with gpu_fleet/refresh_offerings.py.",
+    "preset": "open-weight-fine-tuning",
+    "presets": {
+      "open-weight-fine-tuning": {
+        "_doc": "Recommended for fine-tuning open-weight models: every region that sells H100/H200/B200/B300/A100 and L4/L40S, spot only. 8-GPU spot capacity is per AZ and moves between regions by the hour; racing all of them is what makes a whole node obtainable, so the recommendation is all 18.",
+        "regions": [
+          "us-east-1", "us-east-2", "us-west-1", "us-west-2",
+          "ca-central-1", "sa-east-1",
+          "eu-north-1", "eu-central-1", "eu-west-1", "eu-west-2", "eu-west-3",
+          "ap-northeast-1", "ap-northeast-2", "ap-northeast-3",
+          "ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-southeast-3"
+        ],
+        "families": ["h100", "h200", "b200", "b300", "a100", "l4", "l40s"],
+        "instance_types": [],
+        "raw_ec2": true,
+        "bench_job_definitions": true,
+        "training_job_definitions": true
+      }
+    },
+    "name_prefix": "rt",
+    "vpc_cidr": "10.64.0.0/16",
+    "nat_az_id": {},
+    "no_egress_regions": [],
+    "exclude_az_ids": {},
+    "queue_priority": 100,
+    "max_node_hours": 24,
+    "weight_replica_bucket_prefix": "amzn-s3-demo-bucket-weights",
+    "ecr_replication": true,
+    "repository_prefix": "gpu-train-",
+    "image_builds": [
+      {
+        "id": "gpu-train-hopper",
+        "arch": "hopper",
+        "repository": "gpu-train-hopper",
+        "dockerfile": "samples/earnings_research/response_training/Dockerfile.train",
+        "context": "samples/earnings_research",
+        "branch": "main",
+        "include_paths": ["samples/earnings_research/response_training/"],
+        "exclude_paths": [],
+        "compute_type": "LARGE",
+        "timeout_minutes": 90
+      },
+      {
+        "id": "gpu-train-blackwell",
+        "arch": "blackwell",
+        "repository": "gpu-train-blackwell",
+        "dockerfile": "samples/earnings_research/response_training/Dockerfile.train",
+        "context": "samples/earnings_research",
+        "branch": "main",
+        "include_paths": ["samples/earnings_research/response_training/"],
+        "exclude_paths": [],
+        "build_args": [
+          "BASE_DEVEL=pytorch/pytorch:2.8.0-cuda12.8-cudnn9-devel",
+          "BASE_RUNTIME=pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime",
+          "TORCH_SERIES=2.8",
+          "CUDA_ARCHS=9.0;10.0"
+        ],
+        "compute_type": "LARGE",
+        "timeout_minutes": 90
+      }
+    ]
+  },
   "earnings_research": {
     "nat_gateways": 1,
     "job_definition_name": "earnings-research",

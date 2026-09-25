@@ -19,6 +19,9 @@ from common.fsx import FSxStack
 from common.network import NetworkStack
 from common.pipeline import ImageBuildSpec, PipelineConfig, DeploymentPipelineStack
 from common.s3 import S3Stack
+from gpu_fleet import catalogue as gpu_catalogue
+from gpu_fleet.global_stack import GpuFleetGlobalConfig, GpuFleetGlobalStack
+from gpu_fleet.region_stack import GpuFleetRegionStack, GpuRegionConfig
 from utils import get_stack_name, EnvironmentConfig, load_parameters
 
 # Load environment variables
@@ -32,6 +35,7 @@ app = App()
 # Load default parameters from file
 params = load_parameters(app)
 with_earnings_research = getattr(params, "app_with_earnings_research", False)
+with_gpu_fleet = getattr(params, "app_with_gpu_fleet", False)
 
 # Build the networking stack
 network = NetworkStack(
@@ -98,6 +102,10 @@ if with_earnings_research:
     image_builds.append(
         ImageBuildSpec.from_params(params.earnings_research.image_build)
     )
+if with_gpu_fleet:
+    image_builds += [
+        ImageBuildSpec.from_params(b) for b in params.gpu_fleet.image_builds
+    ]
 
 pipeline_config = PipelineConfig(
     namespace=namespace,
@@ -261,7 +269,75 @@ else:  # ALL
     deploy_single_node_with_cpu()
     deploy_multi_node_with_gpu()
 
+def deploy_gpu_fleet():
+    """
+    Deploy the GPU fine-tuning fleet: one global stack in the home region and one
+    stack per region of the selected preset (gpu_fleet in parameters.json)
+    """
+    gpu = params.gpu_fleet
+    preset = vars(gpu.presets)[gpu.preset]
+    regions = list(preset.regions)
+    instance_types = gpu_catalogue.select(
+        families=preset.families, instance_types=preset.instance_types
+    )
+    offerings = gpu_catalogue.load_offerings()
+    repositories = {
+        b.arch: f"{namespace}-{b.repository}" for b in gpu.image_builds
+    }
+
+    global_stack = GpuFleetGlobalStack(
+        app,
+        get_stack_name(namespace=namespace, prefix="gpu-fleet-global-stack-"),
+        env=env,
+        description=f"GPU fleet IAM and image replication for the {namespace}",
+        config=GpuFleetGlobalConfig(
+            namespace=namespace,
+            home_region=env.region,
+            regions=regions,
+            bucket_arns=[s3_storage.standard_bucket.bucket_arn, *params.s3.custom_arns],
+            weight_replica_bucket_prefix=gpu.weight_replica_bucket_prefix,
+            replication_prefix=f"{namespace}-{gpu.repository_prefix}",
+            ecr_replication=gpu.ecr_replication,
+            raw_ec2=preset.raw_ec2,
+        ),
+    )
+
+    nat_az_ids = vars(gpu.nat_az_id)
+    exclude_az_ids = vars(gpu.exclude_az_ids)
+    for region in regions:
+        stack = GpuFleetRegionStack(
+            app,
+            get_stack_name(namespace=namespace, prefix=f"gpu-fleet-{region}-stack-"),
+            env=Environment(account=env.account, region=region),
+            description=f"GPU fleet in {region} for the {namespace}",
+            config=GpuRegionConfig(
+                namespace=namespace,
+                home_region=env.region,
+                prefix=gpu.name_prefix,
+                instance_types=instance_types,
+                offerings=offerings,
+                vpc_cidr=gpu.vpc_cidr,
+                repositories=repositories,
+                instance_profile_name=global_stack.node_role_name,
+                job_role_name=global_stack.job_role_name,
+                execution_role_name=global_stack.execution_role_name,
+                nat_az_id=nat_az_ids.get(region),
+                egress=region not in gpu.no_egress_regions,
+                exclude_az_ids=tuple(exclude_az_ids.get(region, [])),
+                raw_ec2=preset.raw_ec2,
+                bench_job_definitions=preset.bench_job_definitions,
+                training_job_definitions=preset.training_job_definitions,
+                priority=gpu.queue_priority,
+                max_node_hours=gpu.max_node_hours,
+            ),
+        )
+        stack.add_dependency(global_stack)
+
+
 if with_earnings_research:
     deploy_earnings_research()
+
+if with_gpu_fleet:
+    deploy_gpu_fleet()
 
 app.synth()

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 
 import re
+import shlex
 from dataclasses import dataclass, field
 from typing import Dict, List
 
@@ -35,6 +36,19 @@ class ImageBuildSpec:
     branch: str
     include_paths: List[str] = field(default_factory=list)
     exclude_paths: List[str] = field(default_factory=list)
+    #: extra `docker build --build-arg` values, "KEY=VALUE"
+    build_args: List[str] = field(default_factory=list)
+    compute_type: str = "MEDIUM"
+    timeout_minutes: int = 30
+
+    def docker_build_command(self) -> str:
+        """The build line; extra build args are shell-quoted (a value like "9.0;10.0"
+        would otherwise end the command at the semicolon)"""
+        extra = "".join(f" --build-arg {shlex.quote(a)}" for a in self.build_args)
+        return (
+            f"docker build -f $DOCKERFILE --build-arg CODE_VERSION=$CODE_VERSION{extra}"
+            " -t $ECR_REPOSITORY_URI:$CODE_VERSION $BUILD_CONTEXT"
+        )
 
     @classmethod
     def from_params(cls, entry) -> "ImageBuildSpec":
@@ -168,10 +182,10 @@ class DeploymentPipelineStack(Stack):
             environment=codebuild.BuildEnvironment(
                 privileged=True,  # Required for container image builds
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
-                compute_type=codebuild.ComputeType.MEDIUM,
+                compute_type=codebuild.ComputeType[spec.compute_type],
             ),
             cache=codebuild.Cache.local(codebuild.LocalCacheMode.DOCKER_LAYER),
-            timeout=Duration.minutes(30),
+            timeout=Duration.minutes(spec.timeout_minutes),
             environment_variables={
                 "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(
                     value=repo.repository_uri
@@ -193,7 +207,7 @@ class DeploymentPipelineStack(Stack):
                         },
                         "build": {
                             "commands": [
-                                "docker build -f $DOCKERFILE --build-arg CODE_VERSION=$CODE_VERSION -t $ECR_REPOSITORY_URI:$CODE_VERSION $BUILD_CONTEXT",
+                                spec.docker_build_command(),
                                 "docker tag $ECR_REPOSITORY_URI:$CODE_VERSION $ECR_REPOSITORY_URI:latest",
                             ]
                         },
