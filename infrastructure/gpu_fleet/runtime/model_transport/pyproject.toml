@@ -1,0 +1,17 @@
+[project]
+name = "model_transport"
+version = "0.1.0"
+description = "Shared model-weight transport: region-aware S3 resolution, parallel fetch, HF staging"
+requires-python = ">=3.9"
+dependencies = ["boto3>=1.28"]
+
+[project.optional-dependencies]
+stage = ["huggingface_hub>=0.20", "requests>=2.28"]
+test = ["pytest>=7", "moto[s3]>=5"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["model_transport*"]

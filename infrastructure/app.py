@@ -22,6 +22,7 @@ from common.s3 import S3Stack
 from gpu_fleet import catalogue as gpu_catalogue
 from gpu_fleet.global_stack import GpuFleetGlobalConfig, GpuFleetGlobalStack
 from gpu_fleet.region_stack import GpuFleetRegionStack, GpuRegionConfig
+from gpu_fleet.weights import GpuFleetWeightsConfig, GpuFleetWeightsStack
 from utils import get_stack_name, EnvironmentConfig, load_parameters
 
 # Load environment variables
@@ -281,9 +282,13 @@ def deploy_gpu_fleet():
         families=preset.families, instance_types=preset.instance_types
     )
     offerings = gpu_catalogue.load_offerings()
-    repositories = {
+    runtime_repositories = {
         b.arch: f"{namespace}-{b.repository}" for b in gpu.image_builds
     }
+    repositories = {
+        arch: f"{namespace}-{repo}" for arch, repo in vars(gpu.training_repositories).items()
+    }
+    weight_bucket = gpu.weight_replica_bucket_prefix if gpu.weight_buckets else None
 
     global_stack = GpuFleetGlobalStack(
         app,
@@ -304,6 +309,7 @@ def deploy_gpu_fleet():
 
     nat_az_ids = vars(gpu.nat_az_id)
     exclude_az_ids = vars(gpu.exclude_az_ids)
+    region_stacks = []
     for region in regions:
         stack = GpuFleetRegionStack(
             app,
@@ -318,6 +324,8 @@ def deploy_gpu_fleet():
                 offerings=offerings,
                 vpc_cidr=gpu.vpc_cidr,
                 repositories=repositories,
+                runtime_repositories=runtime_repositories,
+                weight_bucket=weight_bucket,
                 instance_profile_name=global_stack.node_role_name,
                 job_role_name=global_stack.job_role_name,
                 execution_role_name=global_stack.execution_role_name,
@@ -332,6 +340,21 @@ def deploy_gpu_fleet():
             ),
         )
         stack.add_dependency(global_stack)
+        region_stacks.append(stack)
+
+    if weight_bucket:
+        # replication destinations must exist before the rule is written
+        weights = GpuFleetWeightsStack(
+            app,
+            get_stack_name(namespace=namespace, prefix="gpu-fleet-weights-stack-"),
+            env=env,
+            description=f"GPU fleet base-model weight buckets for the {namespace}",
+            config=GpuFleetWeightsConfig(
+                source_bucket=weight_bucket, home_region=env.region, regions=regions
+            ),
+        )
+        for stack in region_stacks:
+            weights.add_dependency(stack)
 
 
 if with_earnings_research:
