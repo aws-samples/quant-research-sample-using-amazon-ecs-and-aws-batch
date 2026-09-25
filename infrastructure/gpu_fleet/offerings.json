@@ -1,0 +1,1818 @@
+{
+ "_doc": "Rewrite offerings.json: where each catalogue instance type can be built, per region.",
+ "generated": "2026-09-25",
+ "regions": {
+  "ap-northeast-1": {
+   "az_ids": [
+    "apne1-az1",
+    "apne1-az2",
+    "apne1-az4"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6.16xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6.24xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6.2xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6.48xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6.4xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6.8xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6.xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.12xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.16xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.24xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.2xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.48xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.4xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.8xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "g6e.xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "gr6.4xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "gr6.8xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "p4d.24xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "p4de.24xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "p5.48xlarge": [
+     "apne1-az1",
+     "apne1-az4"
+    ],
+    "p5.4xlarge": [
+     "apne1-az1"
+    ],
+    "p5en.48xlarge": [
+     "apne1-az4"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p4de.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5en.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "apne1-az1",
+    "apne1-az2",
+    "apne1-az4"
+   ]
+  },
+  "ap-northeast-2": {
+   "az_ids": [
+    "apne2-az1",
+    "apne2-az2",
+    "apne2-az3",
+    "apne2-az4"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6.16xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6.24xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6.2xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6.48xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6.4xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6.8xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6.xlarge": [
+     "apne2-az1",
+     "apne2-az3",
+     "apne2-az4"
+    ],
+    "g6e.12xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "g6e.16xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "g6e.24xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "g6e.2xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "g6e.48xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "g6e.4xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "g6e.8xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "g6e.xlarge": [
+     "apne2-az1",
+     "apne2-az2"
+    ],
+    "gr6.4xlarge": [
+     "apne2-az1",
+     "apne2-az4"
+    ],
+    "gr6.8xlarge": [
+     "apne2-az1",
+     "apne2-az4"
+    ],
+    "p4d.24xlarge": [
+     "apne2-az2",
+     "apne2-az4"
+    ],
+    "p5.48xlarge": [
+     "apne2-az1"
+    ],
+    "p5en.48xlarge": [
+     "apne2-az1"
+    ],
+    "p6-b300.48xlarge": [
+     "apne2-az3"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge",
+    "p5en.48xlarge",
+    "p6-b300.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "apne2-az1",
+    "apne2-az2",
+    "apne2-az3"
+   ]
+  },
+  "ap-northeast-3": {
+   "az_ids": [
+    "apne3-az1",
+    "apne3-az2",
+    "apne3-az3"
+   ],
+   "types": {
+    "g6e.12xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ],
+    "g6e.16xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ],
+    "g6e.24xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ],
+    "g6e.2xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ],
+    "g6e.48xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ],
+    "g6e.4xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ],
+    "g6e.8xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ],
+    "g6e.xlarge": [
+     "apne3-az1",
+     "apne3-az2"
+    ]
+   },
+   "batch": [
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge"
+   ],
+   "endpoint_az_ids": [
+    "apne3-az1",
+    "apne3-az2",
+    "apne3-az3"
+   ]
+  },
+  "ap-south-1": {
+   "az_ids": [
+    "aps1-az1",
+    "aps1-az2",
+    "aps1-az3"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6.16xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6.24xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6.2xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6.48xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6.4xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6.8xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6.xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.12xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.16xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.24xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.2xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.48xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.4xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.8xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "g6e.xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "gr6.4xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "gr6.8xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "p4d.24xlarge": [
+     "aps1-az1",
+     "aps1-az2",
+     "aps1-az3"
+    ],
+    "p5.48xlarge": [
+     "aps1-az1",
+     "aps1-az2",
+     "aps1-az3"
+    ],
+    "p5.4xlarge": [
+     "aps1-az1",
+     "aps1-az2",
+     "aps1-az3"
+    ],
+    "p5en.48xlarge": [
+     "aps1-az1",
+     "aps1-az3"
+    ],
+    "p6-b200.48xlarge": [
+     "aps1-az2"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge",
+    "p5en.48xlarge",
+    "p6-b200.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "aps1-az1",
+    "aps1-az2",
+    "aps1-az3"
+   ]
+  },
+  "ap-southeast-1": {
+   "az_ids": [
+    "apse1-az1",
+    "apse1-az2",
+    "apse1-az3"
+   ],
+   "types": {
+    "p4de.24xlarge": [
+     "apse1-az2",
+     "apse1-az3"
+    ]
+   },
+   "batch": [
+    "p4de.24xlarge"
+   ],
+   "endpoint_az_ids": [
+    "apse1-az1",
+    "apse1-az2",
+    "apse1-az3"
+   ]
+  },
+  "ap-southeast-2": {
+   "az_ids": [
+    "apse2-az1",
+    "apse2-az2",
+    "apse2-az3"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "g6.16xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "g6.24xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "g6.2xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "g6.48xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "g6.4xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "g6.8xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "g6.xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "gr6.4xlarge": [
+     "apse2-az1",
+     "apse2-az2"
+    ],
+    "gr6.8xlarge": [
+     "apse2-az1",
+     "apse2-az2"
+    ],
+    "p4d.24xlarge": [
+     "apse2-az1",
+     "apse2-az2"
+    ],
+    "p5.48xlarge": [
+     "apse2-az1",
+     "apse2-az2",
+     "apse2-az3"
+    ],
+    "p5.4xlarge": [
+     "apse2-az3"
+    ],
+    "p5e.48xlarge": [
+     "apse2-az3"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "apse2-az1",
+    "apse2-az2",
+    "apse2-az3"
+   ]
+  },
+  "ap-southeast-3": {
+   "az_ids": [
+    "apse3-az1",
+    "apse3-az2",
+    "apse3-az3"
+   ],
+   "types": {
+    "p5.48xlarge": [
+     "apse3-az1"
+    ],
+    "p5.4xlarge": [
+     "apse3-az1"
+    ],
+    "p5e.48xlarge": [
+     "apse3-az1",
+     "apse3-az3"
+    ],
+    "p5en.48xlarge": [
+     "apse3-az2",
+     "apse3-az3"
+    ],
+    "p6-b300.48xlarge": [
+     "apse3-az1",
+     "apse3-az3"
+    ]
+   },
+   "batch": [
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge",
+    "p5en.48xlarge",
+    "p6-b300.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "apse3-az1",
+    "apse3-az2",
+    "apse3-az3"
+   ]
+  },
+  "ca-central-1": {
+   "az_ids": [
+    "cac1-az1",
+    "cac1-az2",
+    "cac1-az4"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "g6.16xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "g6.24xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "g6.2xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "g6.48xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "g6.4xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "g6.8xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "g6.xlarge": [
+     "cac1-az1",
+     "cac1-az2",
+     "cac1-az4"
+    ],
+    "gr6.4xlarge": [
+     "cac1-az1",
+     "cac1-az2"
+    ],
+    "gr6.8xlarge": [
+     "cac1-az1",
+     "cac1-az2"
+    ],
+    "p4d.24xlarge": [
+     "cac1-az1",
+     "cac1-az2"
+    ],
+    "p5.48xlarge": [
+     "cac1-az4"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "cac1-az1",
+    "cac1-az2",
+    "cac1-az4"
+   ]
+  },
+  "eu-central-1": {
+   "az_ids": [
+    "euc1-az1",
+    "euc1-az2",
+    "euc1-az3"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6.16xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6.24xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6.2xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6.48xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6.4xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6.8xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6.xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.12xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.16xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.24xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.2xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.48xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.4xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.8xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "g6e.xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "gr6.4xlarge": [
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "gr6.8xlarge": [
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "p4d.24xlarge": [
+     "euc1-az1",
+     "euc1-az2",
+     "euc1-az3"
+    ],
+    "p4de.24xlarge": [
+     "euc1-az1",
+     "euc1-az2"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p4de.24xlarge"
+   ],
+   "endpoint_az_ids": [
+    "euc1-az1",
+    "euc1-az2",
+    "euc1-az3"
+   ]
+  },
+  "eu-north-1": {
+   "az_ids": [
+    "eun1-az1",
+    "eun1-az2",
+    "eun1-az3"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6.16xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6.24xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6.2xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6.48xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6.4xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6.8xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6.xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.12xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.16xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.24xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.2xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.48xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.4xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.8xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "g6e.xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "gr6.4xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "gr6.8xlarge": [
+     "eun1-az1",
+     "eun1-az2"
+    ],
+    "p4d.24xlarge": [
+     "eun1-az3"
+    ],
+    "p5.48xlarge": [
+     "eun1-az1",
+     "eun1-az2",
+     "eun1-az3"
+    ],
+    "p5.4xlarge": [
+     "eun1-az1",
+     "eun1-az2",
+     "eun1-az3"
+    ],
+    "p5e.48xlarge": [
+     "eun1-az1"
+    ],
+    "p5en.48xlarge": [
+     "eun1-az1",
+     "eun1-az3"
+    ],
+    "p6-b200.48xlarge": [
+     "eun1-az2"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge",
+    "p5en.48xlarge",
+    "p6-b200.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "eun1-az1",
+    "eun1-az2",
+    "eun1-az3"
+   ]
+  },
+  "eu-west-1": {
+   "az_ids": [
+    "euw1-az1",
+    "euw1-az2",
+    "euw1-az3"
+   ],
+   "types": {
+    "p4d.24xlarge": [
+     "euw1-az2"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "p4d.24xlarge"
+   ],
+   "endpoint_az_ids": [
+    "euw1-az1",
+    "euw1-az2",
+    "euw1-az3"
+   ]
+  },
+  "eu-west-2": {
+   "az_ids": [
+    "euw2-az1",
+    "euw2-az2",
+    "euw2-az3",
+    "euw2-az4"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "g6.16xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "g6.24xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "g6.2xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "g6.48xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "g6.4xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "g6.8xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "g6.xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "gr6.4xlarge": [
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "gr6.8xlarge": [
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "p4d.24xlarge": [
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "p5.48xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "p5.4xlarge": [
+     "euw2-az1",
+     "euw2-az2",
+     "euw2-az3"
+    ],
+    "p5e.48xlarge": [
+     "euw2-az2"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "euw2-az1",
+    "euw2-az2",
+    "euw2-az3"
+   ]
+  },
+  "eu-west-3": {
+   "az_ids": [
+    "euw3-az1",
+    "euw3-az2",
+    "euw3-az3"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "g6.16xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "g6.24xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "g6.2xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "g6.48xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "g6.4xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "g6.8xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "g6.xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "gr6.4xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "gr6.8xlarge": [
+     "euw3-az2",
+     "euw3-az3"
+    ],
+    "p6-b200.48xlarge": [
+     "euw3-az1"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge"
+   ],
+   "endpoint_az_ids": [
+    "euw3-az1",
+    "euw3-az2",
+    "euw3-az3"
+   ]
+  },
+  "sa-east-1": {
+   "az_ids": [
+    "sae1-az1",
+    "sae1-az2",
+    "sae1-az3"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "g6.16xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "g6.24xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "g6.2xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "g6.48xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "g6.4xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "g6.8xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "g6.xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "gr6.4xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "gr6.8xlarge": [
+     "sae1-az1",
+     "sae1-az2"
+    ],
+    "p4d.24xlarge": [
+     "sae1-az1",
+     "sae1-az3"
+    ],
+    "p5.48xlarge": [
+     "sae1-az3"
+    ],
+    "p5.4xlarge": [
+     "sae1-az3"
+    ],
+    "p5e.48xlarge": [
+     "sae1-az2",
+     "sae1-az3"
+    ],
+    "p6-b300.48xlarge": [
+     "sae1-az2",
+     "sae1-az3"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge",
+    "p6-b300.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "sae1-az1",
+    "sae1-az2",
+    "sae1-az3"
+   ]
+  },
+  "us-east-1": {
+   "az_ids": [
+    "use1-az1",
+    "use1-az2",
+    "use1-az3",
+    "use1-az4",
+    "use1-az5",
+    "use1-az6"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6.16xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6.24xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6.2xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6.48xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6.4xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6.8xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6.xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "g6e.12xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "g6e.16xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "g6e.24xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "g6e.2xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "g6e.48xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "g6e.4xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "g6e.8xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "g6e.xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "gr6.4xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "gr6.8xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "p4d.24xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az4",
+     "use1-az6"
+    ],
+    "p4de.24xlarge": [
+     "use1-az4",
+     "use1-az6"
+    ],
+    "p5.48xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az3",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "p5.4xlarge": [
+     "use1-az1",
+     "use1-az2",
+     "use1-az3",
+     "use1-az4",
+     "use1-az5",
+     "use1-az6"
+    ],
+    "p5en.48xlarge": [
+     "use1-az2",
+     "use1-az6"
+    ],
+    "p6-b200.48xlarge": [
+     "use1-az6"
+    ],
+    "p6-b300.48xlarge": [
+     "use1-az2",
+     "use1-az6"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p4de.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5en.48xlarge",
+    "p6-b200.48xlarge",
+    "p6-b300.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "use1-az1",
+    "use1-az2",
+    "use1-az3",
+    "use1-az4",
+    "use1-az5",
+    "use1-az6"
+   ]
+  },
+  "us-east-2": {
+   "az_ids": [
+    "use2-az1",
+    "use2-az2",
+    "use2-az3"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6.16xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6.24xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6.2xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6.48xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6.4xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6.8xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6.xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.12xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.16xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.24xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.2xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.48xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.4xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.8xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "g6e.xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "gr6.4xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "gr6.8xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "p4d.24xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "p5.48xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "p5.4xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "p5e.48xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "p5en.48xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ],
+    "p6-b200.48xlarge": [
+     "use2-az1",
+     "use2-az2",
+     "use2-az3"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge",
+    "p5en.48xlarge",
+    "p6-b200.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "use2-az1",
+    "use2-az2",
+    "use2-az3"
+   ]
+  },
+  "us-west-1": {
+   "az_ids": [
+    "usw1-az1",
+    "usw1-az3"
+   ],
+   "types": {
+    "p5.48xlarge": [
+     "usw1-az1",
+     "usw1-az3"
+    ],
+    "p5en.48xlarge": [
+     "usw1-az3"
+    ]
+   },
+   "batch": [
+    "p5.48xlarge",
+    "p5en.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "usw1-az1",
+    "usw1-az3"
+   ]
+  },
+  "us-west-2": {
+   "az_ids": [
+    "usw2-az1",
+    "usw2-az2",
+    "usw2-az3",
+    "usw2-az4"
+   ],
+   "types": {
+    "g6.12xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6.16xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6.24xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6.2xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6.48xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6.4xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6.8xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6.xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.12xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.16xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.24xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.2xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.48xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.4xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.8xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "g6e.xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "gr6.4xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "gr6.8xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "p4d.24xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "p4de.24xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3"
+    ],
+    "p5.48xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "p5.4xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "p5e.48xlarge": [
+     "usw2-az3"
+    ],
+    "p5en.48xlarge": [
+     "usw2-az2",
+     "usw2-az3",
+     "usw2-az4"
+    ],
+    "p6-b200.48xlarge": [
+     "usw2-az1",
+     "usw2-az2",
+     "usw2-az4"
+    ],
+    "p6-b300.48xlarge": [
+     "usw2-az1",
+     "usw2-az2"
+    ]
+   },
+   "batch": [
+    "g6.12xlarge",
+    "g6.16xlarge",
+    "g6.24xlarge",
+    "g6.2xlarge",
+    "g6.48xlarge",
+    "g6.4xlarge",
+    "g6.8xlarge",
+    "g6.xlarge",
+    "g6e.12xlarge",
+    "g6e.16xlarge",
+    "g6e.24xlarge",
+    "g6e.2xlarge",
+    "g6e.48xlarge",
+    "g6e.4xlarge",
+    "g6e.8xlarge",
+    "g6e.xlarge",
+    "gr6.4xlarge",
+    "gr6.8xlarge",
+    "p4d.24xlarge",
+    "p4de.24xlarge",
+    "p5.48xlarge",
+    "p5.4xlarge",
+    "p5e.48xlarge",
+    "p5en.48xlarge",
+    "p6-b200.48xlarge",
+    "p6-b300.48xlarge"
+   ],
+   "endpoint_az_ids": [
+    "usw2-az1",
+    "usw2-az2",
+    "usw2-az3",
+    "usw2-az4"
+   ]
+  }
+ }
+}
