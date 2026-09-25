@@ -15,6 +15,10 @@ class NetworkStack(Stack):
     # Define constants for VPC configuration
     DEFAULT_CIDR = "172.0.0.0/16"
     DEFAULT_SUBNET_MASK = 16
+    # Subnet masks used when NAT egress is enabled (isolated subnet kept for existing consumers)
+    EGRESS_ISOLATED_MASK = 17
+    EGRESS_PRIVATE_MASK = 18
+    EGRESS_PUBLIC_MASK = 24
 
     # Define required interface endpoints
     REQUIRED_ENDPOINTS = {
@@ -42,6 +46,7 @@ class NetworkStack(Stack):
         namespace: str,
         availability_zone: str,
         with_s3express: bool = True,
+        nat_gateways: int = 0,
         **kwargs,
     ) -> None:
         """
@@ -54,11 +59,15 @@ class NetworkStack(Stack):
             namespace: Namespace for resource naming
             availability_zone: AZ where resources will be deployed
             with_s3express: Whether to include S3 Express endpoint
+            nat_gateways: NAT gateways to create; > 0 adds a public subnet and a
+                PRIVATE_WITH_EGRESS subnet next to the isolated one (default 0: no egress)
         """
         super().__init__(scope, construct_id, env=env, **kwargs)
 
         # Create VPC and related resources
-        self.vpc = self._create_vpc(namespace, availability_zone, with_s3express)
+        self.vpc = self._create_vpc(
+            namespace, availability_zone, with_s3express, nat_gateways
+        )
         self.security_group = self._create_security_group(namespace)
         self.interface_endpoints = self._create_interface_endpoints()
 
@@ -77,27 +86,56 @@ class NetworkStack(Stack):
 
         return endpoints
 
+    def _create_subnet_configuration(
+        self, nat_gateways: int
+    ) -> List[ec2.SubnetConfiguration]:
+        """Isolated subnet only, or isolated + private-with-egress + public when NAT is on."""
+        if nat_gateways <= 0:
+            return [
+                ec2.SubnetConfiguration(
+                    name="Private",
+                    subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                    cidr_mask=self.DEFAULT_SUBNET_MASK,
+                )
+            ]
+        return [
+            ec2.SubnetConfiguration(
+                name="Private",
+                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                cidr_mask=self.EGRESS_ISOLATED_MASK,
+            ),
+            ec2.SubnetConfiguration(
+                name="PrivateEgress",
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                cidr_mask=self.EGRESS_PRIVATE_MASK,
+            ),
+            ec2.SubnetConfiguration(
+                name="Public",
+                subnet_type=ec2.SubnetType.PUBLIC,
+                cidr_mask=self.EGRESS_PUBLIC_MASK,
+            ),
+        ]
+
     def _create_vpc(
-        self, namespace: str, availability_zone: str, with_s3express: bool
+        self,
+        namespace: str,
+        availability_zone: str,
+        with_s3express: bool,
+        nat_gateways: int = 0,
     ) -> ec2.Vpc:
         """Create VPC with specified configuration."""
+        with_egress = nat_gateways > 0
         return ec2.Vpc(
             self,
             "VPC",
             vpc_name=f"{namespace}-vpc",
             ip_addresses=ec2.IpAddresses.cidr(self.DEFAULT_CIDR),
             availability_zones=[availability_zone],
-            nat_gateways=0,
-            create_internet_gateway=False,
+            nat_gateways=max(nat_gateways, 0),
+            create_internet_gateway=with_egress,
             enable_dns_hostnames=True,
             enable_dns_support=True,
-            subnet_configuration=[
-                ec2.SubnetConfiguration(
-                    name="Private",
-                    subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
-                    cidr_mask=self.DEFAULT_SUBNET_MASK,
-                )
-            ],
+            subnet_configuration=self._create_subnet_configuration(nat_gateways),
             gateway_endpoints=self._create_gateway_endpoints(with_s3express),
         )
 

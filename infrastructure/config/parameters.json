@@ -6,6 +6,7 @@
   "app_with_codepipeline": false,
   "app_with_fsx": false,
   "app_with_s3express": false,
+  "app_with_earnings_research": false,
   "batch": {
     "deployment_type": "ALL",
     "single_node": {
@@ -55,7 +56,25 @@
       ],
       "allocation_strategy": "BEST_FIT_PROGRESSIVE",
       "spot": true
-    }
+    },
+    "queues": [
+      {
+        "id": "cpu",
+        "name": "earnings-research-cpu",
+        "maxv_cpus": 256,
+        "instance_classes": ["C7I", "C7A", "M7I", "M7A", "R7I"],
+        "spot": true,
+        "egress": true
+      },
+      {
+        "id": "capped",
+        "name": "earnings-research-capped",
+        "maxv_cpus": 24,
+        "instance_classes": ["C7I", "M7I"],
+        "spot": true,
+        "egress": true
+      }
+    ]
   },
   "fsx": {
     "per_unit_storage_throughput": 200,
@@ -68,5 +87,24 @@
       "arn:aws:s3:::amzn-s3-demo-bucket/",
       "arn:aws:s3:::amzn-s3-demo-bucket1/"
     ]
+  },
+  "image_builds": [],
+  "register_github_credentials": true,
+  "earnings_research": {
+    "nat_gateways": 1,
+    "job_definition_name": "earnings-research",
+    "secret_names": ["example-redshift-secret", "example-vendor-secret-1", "example-vendor-secret-2"],
+    "bedrock_model_patterns": ["anthropic.*"],
+    "container_cpu": 1,
+    "container_memory": 4096,
+    "image_build": {
+      "id": "earnings-research",
+      "repository": "earnings-research",
+      "dockerfile": "samples/earnings_research/Dockerfile",
+      "context": "samples/earnings_research",
+      "branch": "main",
+      "include_paths": ["samples/earnings_research/"],
+      "exclude_paths": ["samples/earnings_research/mcp/", "samples/earnings_research/.claude/"]
+    }
   }
 }

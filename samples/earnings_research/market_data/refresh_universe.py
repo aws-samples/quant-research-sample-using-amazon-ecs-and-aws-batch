@@ -249,9 +249,9 @@ def main():
     resp = batch.submit_job(
         jobName=f"emd-refresh-{args.start}-{args.end}",
         jobQueue=settings.get("batch", "job_queue"),
-        jobDefinition=settings.get("batch", "job_definitions", "market_data"),
-        containerOverrides={"command": ["plan", "--start", args.start,
-                                        "--end", args.end]})
+        jobDefinition=settings.get("batch", "job_definition"),
+        containerOverrides=settings.job_overrides(
+            "market_data", ["plan", "--start", args.start, "--end", args.end]))
     print(f"\nAPPLIED. Submitted refresh plan job {resp['jobId']}")
     return 0
 

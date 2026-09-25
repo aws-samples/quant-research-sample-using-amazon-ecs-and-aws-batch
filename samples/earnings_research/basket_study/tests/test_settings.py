@@ -105,3 +105,21 @@ def test_sibling_unknown_name_is_an_error(tmp_path):
     settings.reset(anchor=tmp_path / "basket_study" / "settings.py")
     with pytest.raises(settings.SettingsError, match="unknown package"):
         settings.sibling("nope")
+
+
+def test_job_overrides_prefixes_package_and_sizes_by_command(tmp_path):
+    settings.use(_write(tmp_path / "config.json", {"batch": {"resources": {
+        "basket_study": {"vcpus": 1, "memory_mib": 4096},
+        "basket_study:aggregate": {"vcpus": 2, "memory_mib": 16384}}}}))
+    assert settings.job_overrides("basket_study", ["aggregate", "--finalize"]) == {
+        "command": ["basket_study", "aggregate", "--finalize"],
+        "resourceRequirements": [{"type": "VCPU", "value": "2"},
+                                 {"type": "MEMORY", "value": "16384"}]}
+    assert settings.job_overrides("basket_study", ["eval-event"])["resourceRequirements"] == [
+        {"type": "VCPU", "value": "1"}, {"type": "MEMORY", "value": "4096"}]
+
+
+def test_job_overrides_without_resources_keeps_job_definition_defaults(tmp_path):
+    settings.use(_write(tmp_path / "config.json", {"batch": {}}))
+    assert settings.job_overrides("market_data", ["plan"]) == {
+        "command": ["market_data", "plan"]}

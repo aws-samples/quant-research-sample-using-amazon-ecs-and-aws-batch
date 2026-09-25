@@ -1,0 +1,12 @@
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.venv/
+**/tests/
+**/test_*.py
+**/conftest.py
+**/config-test-small.json
+.claude/
+mcp/
+viewer/
+index_constituents/

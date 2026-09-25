@@ -67,7 +67,7 @@ def _panel_prefix(dataset: str) -> str:
     return f"{OUT_PREFIX}/{dataset}"
 
 # Batch target for the array job the `plan` pre-pass submits: settings
-# batch.job_queue / batch.job_definitions.market_data.
+# batch.job_queue / batch.job_definition (shared by all packages).
 
 
 def _make_client(source: str, session):
@@ -126,10 +126,11 @@ def _cmd_plan(args, session) -> int:
     resp = batch.submit_job(
         jobName=f"emd-events-{args.start}-{args.end}",
         jobQueue=settings.get("batch", "job_queue"),
-        jobDefinition=settings.get("batch", "job_definitions", "market_data"),
+        jobDefinition=settings.get("batch", "job_definition"),
         arrayProperties={"size": n},
-        containerOverrides={"command": ["fetch-event", "--manifest", key,
-                                        "--source", args.source]},
+        containerOverrides=settings.job_overrides(
+            "market_data", ["fetch-event", "--manifest", key,
+                            "--source", args.source]),
     )
     print(json.dumps({"manifest": key, "event_count": n, "submitted": True,
                       "array_size": n, "job_id": resp["jobId"],

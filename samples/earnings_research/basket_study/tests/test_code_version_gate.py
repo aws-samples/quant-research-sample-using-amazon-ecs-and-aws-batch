@@ -36,11 +36,12 @@ class _Run:
 
 
 class TestGitCodeVersion:
-    def test_returns_current_git_sha(self, monkeypatch):
-        run = _Run(sha="deadbee")
+    def test_returns_current_git_sha_cut_to_12(self, monkeypatch):
+        # same format the image build bakes: first 12 characters of the full SHA
+        run = _Run(sha="deadbeefcafe" + "0" * 28)
         monkeypatch.setattr(subprocess, "run", run)
-        assert evaluate._git_code_version() == "deadbee"
-        assert ["git", "rev-parse", "--short", "HEAD"] in run.calls
+        assert evaluate._git_code_version() == "deadbeefcafe"
+        assert ["git", "rev-parse", "HEAD"] in run.calls
 
     def test_dirty_tree_aborts(self, monkeypatch):
         monkeypatch.setattr(subprocess, "run", _Run(dirty=True))
