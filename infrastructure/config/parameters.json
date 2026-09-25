@@ -118,39 +118,41 @@
     "exclude_az_ids": {},
     "queue_priority": 100,
     "max_node_hours": 24,
+    "_weights_doc": "Base-model weights. The source bucket is named weight_replica_bucket_prefix (home region); every other fleet region gets <name>-<region>, filled by S3 replication, and the runtime image resolves the region-local replica from that name. Bucket names are global: change it before deploying.",
     "weight_replica_bucket_prefix": "amzn-s3-demo-bucket-weights",
+    "weight_buckets": true,
     "ecr_replication": true,
-    "repository_prefix": "gpu-train-",
+    "_images_doc": "image_builds are the fleet runtime images (gpu_fleet/runtime: the weight downloader and bench_gpu) and back the bench job definitions. Training images are built FROM them into training_repositories and back the sft job definitions. ECR replicates every repository named <namespace>-<repository_prefix>* to every fleet region.",
+    "repository_prefix": "gpu-",
+    "training_repositories": {"hopper": "gpu-train-hopper", "blackwell": "gpu-train-blackwell"},
     "image_builds": [
       {
-        "id": "gpu-train-hopper",
+        "id": "gpu-fleet-hopper",
         "arch": "hopper",
-        "repository": "gpu-train-hopper",
-        "dockerfile": "samples/earnings_research/response_training/Dockerfile.train",
-        "context": "samples/earnings_research",
+        "repository": "gpu-fleet-hopper",
+        "dockerfile": "infrastructure/gpu_fleet/runtime/Dockerfile",
+        "context": "infrastructure/gpu_fleet/runtime",
         "branch": "main",
-        "include_paths": ["samples/earnings_research/response_training/"],
+        "include_paths": ["infrastructure/gpu_fleet/runtime/"],
         "exclude_paths": [],
         "compute_type": "LARGE",
-        "timeout_minutes": 90
+        "timeout_minutes": 60
       },
       {
-        "id": "gpu-train-blackwell",
+        "id": "gpu-fleet-blackwell",
         "arch": "blackwell",
-        "repository": "gpu-train-blackwell",
-        "dockerfile": "samples/earnings_research/response_training/Dockerfile.train",
-        "context": "samples/earnings_research",
+        "repository": "gpu-fleet-blackwell",
+        "dockerfile": "infrastructure/gpu_fleet/runtime/Dockerfile",
+        "context": "infrastructure/gpu_fleet/runtime",
         "branch": "main",
-        "include_paths": ["samples/earnings_research/response_training/"],
+        "include_paths": ["infrastructure/gpu_fleet/runtime/"],
         "exclude_paths": [],
         "build_args": [
-          "BASE_DEVEL=pytorch/pytorch:2.8.0-cuda12.8-cudnn9-devel",
-          "BASE_RUNTIME=pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime",
-          "TORCH_SERIES=2.8",
-          "CUDA_ARCHS=9.0;10.0"
+          "BASE=pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime",
+          "TORCH_SERIES=2.8"
         ],
         "compute_type": "LARGE",
-        "timeout_minutes": 90
+        "timeout_minutes": 60
       }
     ]
   },

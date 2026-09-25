@@ -66,7 +66,9 @@ class GpuFleetGlobalStack(Stack):
         tag_cond_ec2 = {"StringEquals": {f"ec2:ResourceTag/{cat.HUNT_TAG_KEY}": cat.HUNT_TAG_VALUE}}
         tag_cond_ssm = {"StringEquals": {f"ssm:resourceTag/{cat.HUNT_TAG_KEY}": cat.HUNT_TAG_VALUE}}
         buckets = _bucket_resources(c.bucket_arns)
-        replicas = _bucket_resources([f"arn:{part}:s3:::{c.weight_replica_bucket_prefix}-*"])
+        weight_source = _bucket_resources([f"arn:{part}:s3:::{c.weight_replica_bucket_prefix}"])
+        replicas = weight_source + _bucket_resources(
+            [f"arn:{part}:s3:::{c.weight_replica_bucket_prefix}-*"])
 
         # ---- node: the ECS agent, SSM for the raw-EC2 runner, image pull
         node = iam.Role(
@@ -116,6 +118,10 @@ class GpuFleetGlobalStack(Stack):
             # region-local copies of base-model weights, read where the node runs
             iam.PolicyStatement(sid="WeightReplicas", actions=[
                 "s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"], resources=replicas),
+            # `stage_model` writes a Hugging Face repo into the source; replication fans it out
+            iam.PolicyStatement(sid="WeightStage", actions=[
+                "s3:PutObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"],
+                resources=weight_source[1:]),
             # train -> score chains and cross-region races submit and cancel their own jobs
             iam.PolicyStatement(sid="BatchChain", actions=[
                 "batch:SubmitJob", "batch:TerminateJob", "batch:CancelJob", "batch:TagResource"],

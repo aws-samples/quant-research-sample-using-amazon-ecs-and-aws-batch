@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Everything the GPU fleet builds in ONE region: VPC, templates, queues, job definitions
-and the raw-EC2 terminator. One stack per region, so a deploy that fails in one region
+"""Everything the GPU fleet builds in ONE region: VPC, templates, queues, job definitions,
+the weight replica and the raw-EC2 terminator. One stack per region, so a deploy that fails in one region
 (a quota, an AZ that stopped selling a type) rolls back that region only."""
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -14,6 +14,7 @@ from .fleet import GpuFleet, GpuFleetConfig
 from .jobs import FleetJobDefinitions, image_uri
 from .network import FleetNetwork, FleetNetworkConfig
 from .self_managed import SelfManagedNodes
+from .weights import WeightReplica
 
 
 @dataclass
@@ -24,11 +25,17 @@ class GpuRegionConfig:
     instance_types: List[str]
     offerings: dict
     vpc_cidr: str
-    #: arch -> ECR repository name (replicated from the home region)
+    #: arch -> ECR repository of the training images (sft job definitions)
     repositories: Dict[str, str]
+    #: arch -> ECR repository of the fleet runtime image (bench job definitions); both kinds
+    #: are replicated from the home region
+    runtime_repositories: Dict[str, str]
     instance_profile_name: str
     job_role_name: str
     execution_role_name: str
+    #: source bucket of the base-model weights; every region but the home one gets
+    #: `<weight_bucket>-<region>`. None: no weight buckets
+    weight_bucket: Optional[str] = None
     nat_az_id: Optional[str] = None
     egress: bool = True
     exclude_az_ids: Tuple[str, ...] = ()
@@ -68,10 +75,16 @@ class GpuFleetRegionStack(Stack):
             FleetJobDefinitions(
                 self, "JobDefinitions", fleet=self.fleet, prefix=c.prefix,
                 images={arch: image_uri(self, repo) for arch, repo in c.repositories.items()},
+                bench_images={arch: image_uri(self, repo)
+                              for arch, repo in c.runtime_repositories.items()},
+                weight_bucket=c.weight_bucket,
                 job_role_arn=f"arn:{part}:iam::{acct}:role/{c.job_role_name}",
                 execution_role_arn=f"arn:{part}:iam::{acct}:role/{c.execution_role_name}",
                 home_region=c.home_region, bench=c.bench_job_definitions,
                 training=c.training_job_definitions, tags=c.tags)
+
+        if c.weight_bucket and region != c.home_region:
+            self.weight_replica = WeightReplica(self, "WeightReplica", source_bucket=c.weight_bucket)
 
         if c.raw_ec2:
             SelfManagedNodes(self, "SelfManaged",

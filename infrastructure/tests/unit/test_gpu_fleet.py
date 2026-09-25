@@ -13,6 +13,8 @@ from infrastructure.common.pipeline import ImageBuildSpec
 from infrastructure.gpu_fleet import catalogue as cat
 from infrastructure.gpu_fleet.global_stack import GpuFleetGlobalConfig, GpuFleetGlobalStack
 from infrastructure.gpu_fleet.region_stack import GpuFleetRegionStack, GpuRegionConfig
+from infrastructure.gpu_fleet.weights import (GpuFleetWeightsConfig, GpuFleetWeightsStack,
+                                              replica_bucket_name)
 
 ACCOUNT = "012345678901"
 AZS = ["use1-az1", "use1-az2", "use1-az4"]
@@ -38,6 +40,8 @@ def region_template(region="us-east-1", **overrides) -> Template:
               offerings=OFFERINGS, vpc_cidr="10.64.0.0/16",
               repositories={"hopper": "test-gpu-train-hopper",
                             "blackwell": "test-gpu-train-blackwell"},
+              runtime_repositories={"hopper": "test-gpu-fleet-hopper",
+                                    "blackwell": "test-gpu-fleet-blackwell"},
               instance_profile_name="test-gpu-node", job_role_name="test-gpu-job",
               execution_role_name="test-gpu-execution")
     kw.update(overrides)
@@ -231,9 +235,11 @@ def test_job_definitions():
         "sft-8gpu-blackwell-jd", "sft-1gpu-g-hopper-jd", "sft-2gpu-g-hopper-jd"}
     b = jds["bench-gpu-h100-p5-48xl-8g-32c-hopper-jd"]["ContainerProperties"]
     assert [r["Value"] for r in b["ResourceRequirements"]] == ["8", "180", str(int(2048 * 1024 * 0.9))]
-    assert "gpu-train-hopper:latest" in json.dumps(b["Image"])
+    # bench runs the fleet runtime image; sft runs the training image
+    assert "gpu-fleet-hopper:latest" in json.dumps(b["Image"])
     env = {e["Name"]: e["Value"] for e in b["Environment"]}
     assert env["TRAIN_REQUIRE_NVME"] == "1" and env["BENCH_SHAPE"] == "h100-p5-48xl-8g-32c"
+    assert env["GPU_FLEET_HOME_REGION"] == "us-east-1" and "GPU_FLEET_WEIGHT_BUCKET" not in env
     assert b["MountPoints"][0]["ContainerPath"] == "/mnt/nvme"
     s = jds["sft-8gpu-blackwell-jd"]
     assert "gpu-train-blackwell:latest" in json.dumps(s["ContainerProperties"]["Image"])
@@ -252,6 +258,41 @@ def test_self_managed_terminator():
     t.resource_count_is("AWS::Events::Rule", 1)
     t = region_template(raw_ec2=False)
     t.resource_count_is("AWS::Lambda::Function", 0)
+
+
+# ------------------------------------------------------------------------------ weights
+WEIGHTS = "amzn-s3-demo-bucket-weights"
+
+
+def test_weight_replica_only_outside_the_home_region():
+    region_template(weight_bucket=WEIGHTS).resource_count_is("AWS::S3::Bucket", 0)
+    t = region_template("ap-northeast-2", weight_bucket=WEIGHTS)
+    t.has_resource("AWS::S3::Bucket", {
+        "Properties": {"BucketName": f"{WEIGHTS}-ap-northeast-2",
+                       "VersioningConfiguration": {"Status": "Enabled"}},
+        "DeletionPolicy": "Retain"})
+    region_template("ap-northeast-2").resource_count_is("AWS::S3::Bucket", 0)
+    jds = by_name(t, "AWS::Batch::JobDefinition", "JobDefinitionName")
+    for jd in jds.values():
+        env = {e["Name"]: e["Value"] for e in jd["ContainerProperties"]["Environment"]}
+        assert env["GPU_FLEET_WEIGHT_BUCKET"] == WEIGHTS
+
+
+def test_weight_source_replicates_to_every_other_region():
+    stack = GpuFleetWeightsStack(
+        core.App(), "gpu-weights", env=core.Environment(account=ACCOUNT, region="us-east-1"),
+        config=GpuFleetWeightsConfig(source_bucket=WEIGHTS, home_region="us-east-1",
+                                     regions=["us-east-1", "us-west-2", "ap-northeast-2"]))
+    t = Template.from_stack(stack)
+    src = next(iter(t.find_resources("AWS::S3::Bucket").values()))["Properties"]
+    assert src["BucketName"] == WEIGHTS
+    rules = src["ReplicationConfiguration"]["Rules"]
+    assert [(r["Id"], r["Priority"]) for r in rules] == [("to-us-west-2", 1),
+                                                         ("to-ap-northeast-2", 2)]
+    assert f":s3:::{WEIGHTS}-us-west-2" in json.dumps(rules[0]["Destination"])
+    assert all(r["DeleteMarkerReplication"] == {"Status": "Disabled"} for r in rules)
+    with pytest.raises(ValueError, match="63"):
+        replica_bucket_name("x" * 50, "ap-southeast-3")
 
 
 # ------------------------------------------------------------------------------- global
@@ -279,7 +320,7 @@ def _statements(t: Template, role_name: str) -> dict:
 
 def test_job_role_grants():
     st = _statements(global_template(), "test-gpu-job")
-    assert {"Data", "WeightReplicas", "BatchChain", "BatchRead", "Ec2Read", "Ec2TerminateHuntNodes",
+    assert {"Data", "WeightReplicas", "WeightStage", "BatchChain", "BatchRead", "Ec2Read", "Ec2TerminateHuntNodes",
             "SsmRead", "SsmSendCommandHuntNodes", "BedrockInvoke", "BedrockCustomize",
             "BedrockPassCustomizationRole", "SpotQuota", "Logs"} <= set(st)
     assert "s3:DeleteObject" in st["Data"]["Action"]
@@ -287,6 +328,8 @@ def test_job_role_grants():
                                       "arn:aws:s3:::amzn-s3-demo-bucket/*"]
     assert st["Ec2TerminateHuntNodes"]["Condition"] == {
         "StringEquals": {f"ec2:ResourceTag/{cat.HUNT_TAG_KEY}": cat.HUNT_TAG_VALUE}}
+    assert ":s3:::amzn-s3-demo-bucket-weights/*" in json.dumps(st["WeightStage"]["Resource"])
+    assert ":s3:::amzn-s3-demo-bucket-weights\"" in json.dumps(st["WeightReplicas"]["Resource"])
     actions = json.dumps([s["Action"] for s in st.values()])
     for forbidden in ("ec2:RunInstances", "ec2:CreateFleet", "s3tables"):
         assert forbidden not in actions

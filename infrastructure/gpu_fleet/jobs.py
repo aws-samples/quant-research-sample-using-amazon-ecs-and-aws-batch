@@ -7,7 +7,8 @@ A document registered by a script is a revision nobody can attribute to a deploy
 two scripts registering the "same" document drift apart one field at a time.
 
 bench-gpu-<shape>-<arch>-jd   one per template that has a queue in the region: the whole
-                              node less the ECS agent's slice, `bench_gpu` from the image
+                              node less the ECS agent's slice, `bench_gpu` from the fleet
+                              runtime image (gpu_fleet/runtime)
 sft-<size>-<arch>-jd          fine-tuning / scoring: 1gpu and 8gpu on hopper + blackwell,
                               1gpu-g and 2gpu-g (L4 / L40S nodes) on hopper
 
@@ -15,7 +16,8 @@ The arch is the chip's, never a choice. A Hopper image (sm_80/sm_90) on a Blackw
 reports zero devices while the driver sees eight and nothing raises, so that pairing is
 never declared.
 
-Images are `:latest` of the region-local replica of the arch's repository. The ECS agent
+Bench documents run the fleet runtime image; sft documents run the training image built FROM
+it. Images are `:latest` of the region-local replica of the arch's repository. The ECS agent
 pulls on every job start, so a new build reaches the next job without a deploy.
 
 Every document mounts the NVMe pool the launch template builds at /mnt/nvme at the same
@@ -54,16 +56,22 @@ def _resources(gpus: int, vcpu: int, memory_mib: int) -> List[P.ResourceRequirem
 class FleetJobDefinitions(Construct):
     def __init__(self, scope: Construct, construct_id: str, *, fleet: GpuFleet, prefix: str,
                  images: Dict[str, str], job_role_arn: str, execution_role_arn: str,
-                 home_region: str, bench: bool = True, training: bool = True,
+                 home_region: str, bench_images: Dict[str, str] = None,
+                 weight_bucket: str = None, bench: bool = True, training: bool = True,
                  tags: Dict[str, str] = None) -> None:
-        """`images` maps arch (hopper / blackwell) -> image URI in this region."""
+        """`images` maps arch (hopper / blackwell) -> training image URI in this region,
+        `bench_images` the same for the runtime image (default: `images`)."""
         super().__init__(scope, construct_id)
         tags = dict(tags or {})
         self.job_definitions: Dict[str, P] = {}
         pool = cat.NVME_POOL
         #: data buckets live in the home region; the job reads its placement region from task
         #: metadata, never from this variable
-        base_env = {"AWS_DEFAULT_REGION": home_region}
+        base_env = {"AWS_DEFAULT_REGION": home_region, "GPU_FLEET_HOME_REGION": home_region}
+        if weight_bucket:
+            #: the SOURCE bucket; the image resolves the region-local replica itself
+            base_env["GPU_FLEET_WEIGHT_BUCKET"] = weight_bucket
+        bench_images = bench_images or images
 
         def declare(name: str, container: P.ContainerPropertiesProperty, timeout_s: int):
             self.job_definitions[name] = P(
@@ -81,7 +89,7 @@ class FleetJobDefinitions(Construct):
                     continue   # template-only: no queue to submit to
                 rr = cat.bench_resources(shape.itype)
                 declare(cat.bench_job_definition_name(shape, prefix), P.ContainerPropertiesProperty(
-                    image=images[shape.arch], job_role_arn=job_role_arn,
+                    image=bench_images[shape.arch], job_role_arn=job_role_arn,
                     execution_role_arn=execution_role_arn, command=["bench_gpu"],
                     resource_requirements=_resources(rr["gpus"], rr["vcpu"], rr["memory_mib"]),
                     environment=_env({**base_env, "TRAIN_NVME_POOL": pool, "TRAIN_SCRATCH": pool,
