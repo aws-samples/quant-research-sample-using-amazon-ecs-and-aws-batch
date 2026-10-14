@@ -1,0 +1,6 @@
+polars>=1.30
+numpy>=1.26
+scipy>=1.13
+s3fs>=2025.3
+boto3>=1.35
+pytest>=8
