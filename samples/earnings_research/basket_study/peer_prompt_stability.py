@@ -94,7 +94,7 @@ def main():
                 print(f"  {done}/{len(futs)} calls, {time.time() - t0:.0f}s", flush=True)
     df = pd.DataFrame(rows).sort_values(["model", "run"])
     s3io = S3IO(profile=args.profile)
-    key = f"s3://{settings.get("s3", "data_bucket")}/{args.s3_prefix}/diagnostics/peer_stability/prompt_runs_{args.symbol}.parquet"
+    key = f"s3://{settings.get('s3', 'data_bucket')}/{args.s3_prefix}/diagnostics/peer_stability/prompt_runs_{args.symbol}.parquet"
     if args.append:
         try:
             old = s3io.read_parquet(key).to_pandas()

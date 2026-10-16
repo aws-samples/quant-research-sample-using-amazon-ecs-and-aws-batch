@@ -26,7 +26,7 @@ MARKS_KEY = "diagnostics/reporter_marks.parquet"
 
 
 def marks_uri(s3_prefix: str) -> str:
-    return f"s3://{settings.get("s3", "data_bucket")}/{s3_prefix}/{MARKS_KEY}"
+    return f"s3://{settings.get('s3', 'data_bucket')}/{s3_prefix}/{MARKS_KEY}"
 
 
 def build(s3, s3_prefix: str, threads: int = 96) -> pd.DataFrame:
@@ -67,7 +67,7 @@ def main():
     if args.write:
         buf = io.BytesIO()
         df.to_parquet(buf, index=False)
-        s3.put_object(Bucket=settings.get("s3", "data_bucket"), Key=f"{args.s3_prefix}/{MARKS_KEY}", Body=buf.getvalue())
+        s3.put_object(Bucket=settings.get('s3', 'data_bucket'), Key=f"{args.s3_prefix}/{MARKS_KEY}", Body=buf.getvalue())
         print(f"wrote {marks_uri(args.s3_prefix)}")
 
 

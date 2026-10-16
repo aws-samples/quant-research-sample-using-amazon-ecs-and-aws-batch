@@ -69,6 +69,14 @@ import settings  # noqa: E402
 
 def _bucket() -> str:
     return settings.get("s3", "data_bucket")
+
+
+def __getattr__(name):
+    """`<module>.BUCKET` resolves on access (PEP 562) so importing reads no config (settings design);
+    use `module.BUCKET` at the point of use, never `from module import BUCKET`."""
+    if name == "BUCKET":
+        return _bucket()
+    raise AttributeError(name)
 TRADING_DAYS = 252
 BOOT_N = 2000
 SEED = 7
@@ -413,7 +421,11 @@ def fig_parallel_coordinates(metrics: pd.DataFrame, out: str):
 # ------------------------------------------------------------ exit timing
 
 def _mark_label(col: str) -> str:
-    return "close" if col == "pnl" else f"{col[4:6]}:{col[6:8]}"
+    if col == "pnl":
+        return "close"
+    if col.startswith("pnl_d") and col[5:].isdigit():          # multi-day holds (2026-10-12)
+        return f"day {int(col[5:])} close"
+    return f"{col[4:6]}:{col[6:8]}"
 
 
 def exit_timing_study(ok: pd.DataFrame, all_marks: dict, exits: list):

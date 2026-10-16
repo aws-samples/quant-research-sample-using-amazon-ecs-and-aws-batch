@@ -46,7 +46,7 @@ TIERS = ["micro", "small", "mid"]
 
 
 def load(s3io, prefix):
-    df = pl.read_parquet(f"s3://{settings.get("s3", "data_bucket")}/{prefix}/shards_consolidated/shards.parquet",
+    df = pl.read_parquet(f"s3://{settings.get('s3', 'data_bucket')}/{prefix}/shards_consolidated/shards.parquet",
                          storage_options=s3io.pl_opts)
     rows = (df.filter(pl.col("liquidity_tier").is_in(TIERS)
                       & (pl.col("construction") == "equal_weight_dollar_neutral")
@@ -159,7 +159,7 @@ def main():
     pd.set_option("display.width", 200)
     print(sm.round(3).to_string(index=False))
     if args.write:
-        base = f"s3://{settings.get("s3", "data_bucket")}/{args.s3_prefix}/diagnostics/peer_stability"
+        base = f"s3://{settings.get('s3', 'data_bucket')}/{args.s3_prefix}/diagnostics/peer_stability"
         s3io.write_parquet(pl.from_pandas(rep), f"{base}/per_reporter.parquet")
         s3io.write_parquet(pl.from_pandas(pr), f"{base}/per_pair.parquet")
         s3io.write_csv(pl.from_pandas(sm), f"{base}/summary.csv")

@@ -33,7 +33,7 @@ CONSOLIDATED = "shards_consolidated/shards.parquet"
 
 
 def consolidated_uri(s3_prefix: str) -> str:
-    return f"s3://{settings.get("s3", "data_bucket")}/{s3_prefix}/{CONSOLIDATED}"
+    return f"s3://{settings.get('s3', 'data_bucket')}/{s3_prefix}/{CONSOLIDATED}"
 
 
 def main():
@@ -45,7 +45,7 @@ def main():
 
     sess = boto3.Session(profile_name=args.profile) if args.profile else boto3.Session()
     s3 = sess.client("s3", config=boto3.session.Config(max_pool_connections=args.threads + 40))
-    bucket, prefix = settings.get("s3", "data_bucket"), f"{args.s3_prefix}/shards/"
+    bucket, prefix = settings.get('s3', 'data_bucket'), f"{args.s3_prefix}/shards/"
     t = time.time()
     keys = [o["Key"] for pg in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix)
             for o in pg.get("Contents", []) if o["Key"].endswith(".parquet")]

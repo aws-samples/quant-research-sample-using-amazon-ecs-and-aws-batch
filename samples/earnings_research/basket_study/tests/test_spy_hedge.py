@@ -137,3 +137,18 @@ def test_no_spy_bars_skips_not_crashes():
     p = pd.read_parquet(require(FIX / "panel_1203531964_subset.parquet"))
     rows = evaluate_event(p, constructions=["spy_dollar_neutral"])
     assert len(rows) == 1 and rows[0]["status"] == "skip" and "no SPY bars" in rows[0]["skip_reason"]
+
+
+def test_stub_panel_without_real_bars_attaches_nothing():
+    """239 stub panels (no premarket print / RTH release) have only event_bar rows -> the
+    window is NaT; attach must return the panel unchanged instead of raising (2026-09-24)."""
+    p = pd.read_parquet(require(FIX / "panel_1203531964_subset.parquet"))
+    stub = p[p["event_bar"].astype(bool)].copy()
+    assert len(stub) and pd.isna(spy_bars.panel_window(stub)[0])
+
+    class NoS3:
+        def read_parquet(self, *_):
+            raise AssertionError("must not touch S3 for a stub panel")
+
+    out = spy_bars.attach_spy_for_panel(stub, NoS3())
+    assert len(out) == len(stub) and not (out["symbol"] == "SPY").any()

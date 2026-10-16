@@ -13,6 +13,8 @@ Conventions (README "Rules"):
   exit mark      = close of the last RTH bar of the trade day (forward-fill
                    never needed: a leg with no RTH print that day uses its
                    most recent prior print, same forward-fill rule)
+  N-day hold     = same entry, exit mark on trading day N (day 1 = trade day;
+                   hold_sessions gives days 2..N from the XNYS calendar)
 """
 
 from datetime import date, timedelta
@@ -59,6 +61,17 @@ def trade_day_for_event(event_ts_utc: pd.Timestamp) -> Optional[str]:
     if d in sessions and RTH_START_MIN <= minute < RTH_END_MIN:
         return None                                   # RTH release: excluded
     return str(next(s for s in sessions if s > d))    # after-hours / non-session
+
+
+def hold_sessions(trade_day: str, n_days: int) -> list:
+    """Trading days 2..n_days of a position entered on trade_day (day 1), as
+    'YYYY-MM-DD' strings from the XNYS calendar — weekends and holidays
+    skipped. n_days <= 1 -> []."""
+    if n_days <= 1:
+        return []
+    d = date.fromisoformat(trade_day)
+    sched = _XNYS.schedule(start_date=d + timedelta(days=1), end_date=d + timedelta(days=3 * n_days + 10))
+    return [str(s.date()) for s in sched.index][: n_days - 1]
 
 
 def previous_close(bars: pd.DataFrame, symbol: str, trade_day: str) -> Optional[float]:

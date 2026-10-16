@@ -25,6 +25,14 @@ import settings  # noqa: E402
 
 def _bucket() -> str:
     return settings.get("s3", "data_bucket")
+
+
+def __getattr__(name):
+    """`<module>.BUCKET` resolves on access (PEP 562) so importing reads no config (settings design);
+    use `module.BUCKET` at the point of use, never `from module import BUCKET`."""
+    if name == "BUCKET":
+        return _bucket()
+    raise AttributeError(name)
 SOURCE_KEY = "market-data/spy/spy_1min_2y.parquet"
 MONTH_PREFIX = "market-data/spy/1min_by_month/"
 SPY_SYMBOL = "SPY"
@@ -99,6 +107,8 @@ def attach_spy(panel: pd.DataFrame, spy: pd.DataFrame) -> pd.DataFrame:
 
 def attach_spy_for_panel(panel: pd.DataFrame, s3io) -> pd.DataFrame:
     start, end = panel_window(panel)
+    if pd.isna(start) or pd.isna(end):     # no real bars (stub panel): nothing to hedge with
+        return attach_spy(panel, pd.DataFrame())
     return attach_spy(panel, load_spy_bars(s3io, start, end))
 
 

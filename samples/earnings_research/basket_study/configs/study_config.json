@@ -423,6 +423,69 @@
         ]
       },
       {
+        "key": "px_ge15",
+        "label": "PX15+",
+        "title": "Reporter price >= $15 (9:30 entry fill)",
+        "price_bins": [
+          15,
+          null
+        ]
+      },
+      {
+        "key": "px_ge20",
+        "label": "PX20+",
+        "title": "Reporter price >= $20 (9:30 entry fill)",
+        "price_bins": [
+          20,
+          null
+        ]
+      },
+      {
+        "key": "px_ge25",
+        "label": "PX25+",
+        "title": "Reporter price >= $25 (9:30 entry fill)",
+        "price_bins": [
+          25,
+          null
+        ]
+      },
+      {
+        "key": "px_ge30",
+        "label": "PX30+",
+        "title": "Reporter price >= $30 (9:30 entry fill)",
+        "price_bins": [
+          30,
+          null
+        ]
+      },
+      {
+        "key": "px_ge35",
+        "label": "PX35+",
+        "title": "Reporter price >= $35 (9:30 entry fill)",
+        "price_bins": [
+          35,
+          null
+        ]
+      },
+      {
+        "key": "px_ge40",
+        "label": "PX40+",
+        "title": "Reporter price >= $40 (9:30 entry fill)",
+        "price_bins": [
+          40,
+          null
+        ]
+      },
+      {
+        "key": "px_ge45",
+        "label": "PX45+",
+        "title": "Reporter price >= $45 (9:30 entry fill)",
+        "price_bins": [
+          45,
+          null
+        ]
+      },
+      {
         "key": "px_ge50",
         "label": "PX50+",
         "title": "Reporter price >= $50 (9:30 entry fill)",

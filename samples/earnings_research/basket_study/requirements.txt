@@ -15,3 +15,9 @@ fsspec==2026.7.0
 pandas_market_calendars>=4.4.0
 # report charts
 matplotlib>=3.8.0
+
+# unit tests (python evaluate.py test --src <zip>, or pytest tests/)
+pytest>=8.0
+
+# aggregate_sentiment.py paired Sharpe / sign tests
+scipy>=1.11

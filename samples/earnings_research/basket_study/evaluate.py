@@ -29,7 +29,9 @@ Usage:
 
 import argparse
 import io
+import random
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -37,20 +39,30 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rules.sessions import (consolidate, entry_price, exit_price,
+from rules.sessions import (consolidate, entry_price, exit_price, hold_sessions,
                             previous_close, signal_price, trade_day_for_event)
 from rules.direction import fade_the_gap
 from rules.sentiment_direction import apply_sentiment
-from construction.base import BasketContext, admissible_peers, universe_symbols
+from construction.base import UNIVERSES as GRID_UNIVERSES, BasketContext, admissible_peers, universe_symbols
+from construction.base import EXTRA_UNIVERSES
 from construction.registry import (CONSTRUCTIONS, OUTRIGHT, SPY_HEDGED, UNHEDGED_UNIVERSE,  # noqa: F401
                                    needs_spy, pseudo_universe, select as select_constructions)
 from spy_bars import BENCHMARK_REL, SPY_SYMBOL, attach_spy_for_panel
+from corr_peers_bars import CORR_UNIVERSE, attach_corr_peers_for_panel, covered_event_ids, peersets as corr_peersets
 
 import settings  # noqa: E402
 
 
 def _bucket() -> str:
     return settings.get("s3", "data_bucket")
+
+
+def __getattr__(name):
+    """`<module>.BUCKET` resolves on access (PEP 562) so importing reads no config (settings design);
+    use `module.BUCKET` at the point of use, never `from module import BUCKET`."""
+    if name == "BUCKET":
+        return _bucket()
+    raise AttributeError(name)
 # Panel sources come from the single study config (configs/study_config.json)
 import study_config
 _EVAL_CFG = study_config.load()["evaluation"]
@@ -60,6 +72,8 @@ UNIVERSES = ["all", "pure play", "functional", "correlated"]
 # Batch target for the array job `plan` submits: settings batch.job_queue and
 # batch.job_definition (the one job definition owned by the infrastructure stack);
 # containerOverrides from settings.job_overrides (dispatcher command + batch.resources).
+# event x reporter map used by `plan --peer-source corr` to keep covered events only
+EVENTS_PEERS_KEY = "earnings-basket-study/results-10y-v2/extracts/events_peers.parquet"
 
 # Sentiment study configuration (Task 6)
 BANDS = [2, 3, 4, 5]
@@ -75,6 +89,20 @@ MARK_MINUTES = [9 * 60 + m for m in (31, 32, 33, 34, 35)] + [10 * 60] \
 MARK_MINUTES = sorted(set(MARK_MINUTES))
 MARK_LABELS = [f"pnl_{m // 60:02d}{m % 60:02d}" for m in MARK_MINUTES]
 
+# Multi-day holding periods (user ask 2026-10-12): same 9:30 entry, every leg
+# held at its entry weight, exit at the RTH close of trading day N (day 1 =
+# the trade day, i.e. `pnl`). pnl_dN = sum_i w_i (close_i(day N) / entry_i - 1)
+# with the exit-mark forward-fill per leg; NULL when the panel does not carry
+# that session at all.
+HOLD_DAYS = [2, 3, 4, 5]
+HOLD_LABELS = [f"pnl_d{k}" for k in HOLD_DAYS]
+
+# Batch task sizing rule (user, 2026-10-12): the scheduler dispatches ~30 jobs/s,
+# so a child must run >= 1 min (<= 10 min). `plan` packs this many events per
+# array child by default (--events-per-child overrides). Smoke 2026-10-12 on
+# 2026-07 panels: LLM arm ~2.3 s/event, corr arm ~1.7 s, so 80 -> ~3 min.
+EVENTS_PER_CHILD = 80
+
 # Reporter liquidity tier — proxy for cap category (no shares-outstanding in
 # our data): trade-day dollar volume of the reporter, RTH only.
 LIQ_TIERS = [(2e6, "micro"), (2e7, "small"), (2e8, "mid"), (float("inf"), "large")]
@@ -86,7 +114,7 @@ CSV_COLUMNS = ["event_id", "event_symbol", "event_date", "event_time_et",
                "trade_day", "signal_return_928_vs_prev_close", "direction",
                "reporter_dollar_vol_day", "liquidity_tier",
                "construction", "universe", "status", "skip_reason", "pnl",
-               *MARK_LABELS,
+               *MARK_LABELS, *HOLD_LABELS,
                "n_peers_theo", "n_peers_actual", "peers_theo", "peers_actual",
                "n_ffill_entries", "hedge_gross", "clamped",
                "n_dropped_negative",
@@ -110,6 +138,7 @@ CSV_DTYPES = {"event_id": "Int64", "event_symbol": "string",
               "universe": "string", "status": "string",
               "skip_reason": "string", "pnl": "Float64",
               **{lbl: "Float64" for lbl in MARK_LABELS},
+              **{lbl: "Float64" for lbl in HOLD_LABELS},
               "n_peers_theo": "Int64", "n_peers_actual": "Int64",
               "peers_theo": "string", "peers_actual": "string",
               "n_ffill_entries": "Int64", "hedge_gross": "Float64",
@@ -171,12 +200,41 @@ def _git_code_version() -> str:
     return sha
 
 
+def mark_price(bars: pd.DataFrame, sym: str, day: str, minute: int) -> Optional[float]:
+    """Last print at/before `minute` ET on the trade day (any session that
+    morning; bars of earlier days in the panel count), same forward-fill
+    spirit as entry/exit marks. None if the symbol has no such print."""
+    b = bars[(bars["symbol"] == sym)
+             & ((bars["et_date"] < day)
+                | ((bars["et_date"] == day) & (bars["et_min"] <= minute)))]
+    return float(b.iloc[-1]["close"]) if len(b) else None
+
+
+def leg_pnl_sum(legs, start: Optional[float] = 0.0) -> Optional[float]:
+    """Basket P&L per $1 of reporter notional at ONE mark: `start` plus, over the
+    booked legs (weight, entry, price) in basket order, weight * (price / entry - 1).
+    A leg whose price is None (no print to mark) adds nothing; start None (the
+    panel does not carry that session, multi-day holds) -> None. This is the
+    single accumulation every P&L column of evaluate_event goes through (close,
+    intraday marks, day-N holds), so a recomputation from per-leg prices is
+    float-identical when it passes the legs in the same order."""
+    if start is None:
+        return None
+    acc = start
+    for w, e, p in legs:
+        if p is not None:
+            acc += w * (p / e - 1.0)
+    return acc
+
+
 def event_table(panel: pd.DataFrame, sentiment_ctx: Optional[dict] = None,
-                constructions: Optional[List[str]] = None) -> pd.DataFrame:
+                constructions: Optional[List[str]] = None, universes: Optional[List[str]] = None,
+                leg_sink: Optional[list] = None) -> pd.DataFrame:
     """One event's results as a flat table, event fields on EVERY row —
     the per-event unit that aggregation concatenates. Dtypes are enforced so
-    every shard has the identical parquet schema regardless of skip status."""
-    df = pd.DataFrame(evaluate_event(panel, sentiment_ctx, constructions))
+    every shard has the identical parquet schema regardless of skip status.
+    leg_sink: see evaluate_event (per-leg mark inputs, window_trace --pointwise)."""
+    df = pd.DataFrame(evaluate_event(panel, sentiment_ctx, constructions, universes, leg_sink=leg_sink))
     cols = CSV_COLUMNS + (SENTIMENT_COLUMNS if sentiment_ctx is not None else [])
     dtypes = CSV_DTYPES | (SENTIMENT_DTYPES if sentiment_ctx is not None else {})
     for c in cols:
@@ -186,13 +244,23 @@ def event_table(panel: pd.DataFrame, sentiment_ctx: Optional[dict] = None,
 
 
 def evaluate_event(panel: pd.DataFrame, sentiment_ctx: Optional[dict] = None,
-                   constructions: Optional[List[str]] = None) -> List[dict]:
+                   constructions: Optional[List[str]] = None, universes: Optional[List[str]] = None,
+                   leg_sink: Optional[list] = None) -> List[dict]:
     """All grid cells for one panel. Returns long-format rows (incl. skips).
 
     constructions: names to evaluate (registry.select); default = the four
     hedged constructions x the four peer universes. Unhedged constructions
     (registry.OUTRIGHT, e.g. reporter_only) are emitted ONCE per event under
-    universe UNHEDGED_UNIVERSE, since peer universes do not apply to them."""
+    universe UNHEDGED_UNIVERSE, since peer universes do not apply to them.
+    universes: peer universes for the hedged constructions (default the 4 x 4 grid's
+    UNIVERSES); the corr-peer arm passes [CORR_UNIVERSE] after corr_peers_bars attached
+    the hedge legs under that relationship. An extra universe with no peer rows gives one
+    explicit skip row per construction ("no_<universe>_peers").
+    leg_sink: optional list; when given, one dict per BOOKED leg of every ok cell is
+    appended (construction, universe, leg_order, symbol, weight, entry, is_reporter,
+    close price, the price at every MARK_LABELS mark and HOLD_LABELS hold (None where
+    unmarked), hold dates and session coverage) — the inputs leg_pnl_sum adds up
+    (window_trace.py --pointwise). Rows returned are unchanged by it."""
     reporter = panel[panel["reporter_relationship"] == "primary"]["symbol"].iloc[0]
     event_id = int(panel["event_id"].iloc[0])
     event_ts = panel[panel["event_bar"]]["ts"].iloc[0]
@@ -259,26 +327,28 @@ def evaluate_event(panel: pd.DataFrame, sentiment_ctx: Optional[dict] = None,
     ctx = BasketContext(bars=bars, reporter=reporter, peers=peers,
                         trade_day=day, direction=sig_dir)
 
-    def mark_price(sym: str, minute: int):
-        """Last print at/before `minute` ET on the trade day (any session
-        that morning), same forward-fill spirit as entry/exit marks."""
-        b = bars[(bars["symbol"] == sym)
-                 & ((bars["et_date"] < day)
-                    | ((bars["et_date"] == day) & (bars["et_min"] <= minute)))]
-        return float(b.iloc[-1]["close"]) if len(b) else None
+    # holding periods: trading day k's date for k = 2..5, and whether the panel
+    # carries that session at all (any symbol with an RTH print that day)
+    hold_dates = dict(zip(HOLD_LABELS, hold_sessions(day, max(HOLD_DAYS))))
+    rth_dates = set(bars.loc[(bars["et_min"] >= 570) & (bars["et_min"] < 960), "et_date"])
+    hold_covered = {lbl: d in rth_dates for lbl, d in hold_dates.items()}
 
     rows = []
+    grid = list(universes) if universes else list(GRID_UNIVERSES)
     for cname, build in select_constructions(constructions).items():
-        for univ in ([pseudo_universe(cname)] if pseudo_universe(cname) else UNIVERSES):
+        for univ in ([pseudo_universe(cname)] if pseudo_universe(cname) else grid):
             cell = base | {"construction": cname, "universe": univ}
+            if univ in EXTRA_UNIVERSES and not peers_raw.get(univ):
+                rows.append(cell | {"status": "skip", "skip_reason": f"no_{univ}_peers"})
+                continue
             basket = build(ctx, univ)
             if not basket.weights:
                 rows.append(cell | {"status": "skip",
                                     "skip_reason": f"construction:{basket.diagnostics.get('skip')}"})
                 continue
-            pnl, n_ffill = 0.0, 0
+            n_ffill = 0
             peers_actual = []
-            marks = dict.fromkeys(MARK_LABELS, 0.0)
+            booked = []                            # (weight, entry, close, {mark: price}, {hold: price})
             shares_per_dollar, legs = 0.0, []
             for sym, w in basket.weights.items():
                 if sym == reporter:
@@ -291,15 +361,24 @@ def evaluate_event(panel: pd.DataFrame, sentiment_ctx: Optional[dict] = None,
                     n_ffill += int(at_open.empty)
                 if e is None or x is None or e <= 0:
                     continue                       # unmarkable leg: drop, log count
-                pnl += w * (x / e - 1.0)
                 shares_per_dollar += abs(w) / e
                 legs.append(f"{sym}:{w:.10g}:{e:.10g}")
-                for minute, lbl in zip(MARK_MINUTES, MARK_LABELS):
-                    mp = mark_price(sym, minute)
-                    if mp is not None:
-                        marks[lbl] += w * (mp / e - 1.0)
+                mps = {lbl: mark_price(bars, sym, day, minute) for minute, lbl in zip(MARK_MINUTES, MARK_LABELS)}
+                # day-k close, ffill per leg; not looked up when the panel lacks the session
+                xks = {lbl: (exit_price(bars, sym, hd) if hold_covered[lbl] else None)
+                       for lbl, hd in hold_dates.items()}
+                booked.append((w, e, x, mps, xks))
+                if leg_sink is not None:
+                    leg_sink.append({"event_id": event_id, "construction": cname, "universe": univ,
+                                     "leg_order": len(booked) - 1, "symbol": sym, "weight": w, "entry": e,
+                                     "is_reporter": sym == reporter, "close": x, "marks": mps, "holds": xks,
+                                     "hold_dates": dict(hold_dates), "hold_covered": dict(hold_covered)})
                 if sym != reporter:
                     peers_actual.append(sym)
+            pnl = leg_pnl_sum((w, e, x) for w, e, x, _, _ in booked)
+            marks = {lbl: leg_pnl_sum((w, e, mps[lbl]) for w, e, _, mps, _ in booked) for lbl in MARK_LABELS}
+            holds = {lbl: leg_pnl_sum(((w, e, xks[lbl]) for w, e, _, _, xks in booked),
+                                      start=0.0 if hold_covered[lbl] else None) for lbl in HOLD_LABELS}
             # theo = peer universe before any drops (clip/no-bars/unmarkable);
             # actual = peer legs that made it into the P&L. Symbol lists are
             # space-separated so the CSV stays flat.
@@ -309,7 +388,7 @@ def evaluate_event(panel: pd.DataFrame, sentiment_ctx: Optional[dict] = None,
                 peers_theo = [SPY_SYMBOL]
             else:
                 peers_theo = universe_symbols(peers, univ, reporter)
-            rows.append(cell | marks | {
+            rows.append(cell | marks | holds | {
                 "status": "ok", "pnl": pnl,
                 "n_peers_theo": len(peers_theo),
                 "n_peers_actual": len(peers_actual),
@@ -339,7 +418,8 @@ def list_panels(s3, dates: Optional[List[str]]) -> List[str]:
 
 
 def process_panel(panel: pd.DataFrame, s3io, report_dir: Path, s3_prefix: str,
-                  charts: bool, constructions: Optional[List[str]] = None) -> pd.DataFrame:
+                  charts: bool, constructions: Optional[List[str]] = None,
+                  peer_source: Optional[str] = None) -> pd.DataFrame:
     """Evaluate one panel, write its report bundle locally + to S3.
     Returns the event's result table. The per-EVENT unit of work — identical
     under the serial sweep and the Batch array child."""
@@ -348,7 +428,13 @@ def process_panel(panel: pd.DataFrame, s3io, report_dir: Path, s3_prefix: str,
 
     if needs_spy(constructions):
         panel = attach_spy_for_panel(panel, s3io)       # SPY leg for the SPY-hedged cells
-    t = event_table(panel, constructions=constructions)
+    universes = None
+    if peer_source == "corr":                           # corr-peer arm: hardcoded peers replace the LLM buckets
+        panel = attach_corr_peers_for_panel(panel, s3io)
+        universes = [CORR_UNIVERSE]
+    elif peer_source:
+        raise ValueError(f"unknown peer source {peer_source!r}")
+    t = event_table(panel, constructions=constructions, universes=universes)
     event_id = int(t["event_id"].iloc[0])
     evdir = Path(report_dir) / str(event_id)
     if charts:
@@ -360,6 +446,42 @@ def process_panel(panel: pd.DataFrame, s3io, report_dir: Path, s3_prefix: str,
     if s3_prefix:
         sync_dir_to_s3(s3io, evdir, f"s3://{_bucket()}/{s3_prefix}/events/{event_id}")
     return t
+
+
+RETRY_CODES = {"SlowDown", "503", "500", "InternalError", "RequestTimeout", "Throttling", "ThrottlingException",
+               "ServiceUnavailable", "RequestLimitExceeded"}
+
+
+def read_panel(s3, key: str, attempts: int = 8) -> pd.DataFrame:
+    """GetObject with exponential back-off on S3 throttling (SlowDown: 2026-10-12, four
+    arrays x ~3,000 children on one panel prefix exhausted boto's default 4 tries ->
+    3,542 error shards across the four arms). Other client errors raise at once."""
+    from botocore.exceptions import ClientError
+    for i in range(attempts):
+        try:
+            return pd.read_parquet(io.BytesIO(s3.get_object(Bucket=_bucket(), Key=key)["Body"].read()))
+        except ClientError as e:
+            code = str(e.response.get("Error", {}).get("Code", ""))
+            if code not in RETRY_CODES or i == attempts - 1:
+                raise
+            time.sleep(min(60.0, 1.5 * 2 ** i) + random.uniform(0, 1.0))
+    raise RuntimeError("unreachable")
+
+
+def pack_panels(keys: List[str], per_child: int) -> List[List[str]]:
+    """Contiguous slices of `per_child` panel keys: one slice per array child
+    (sizing rule: a child must run >= 1 min, so never one event per child)."""
+    if per_child < 1:
+        raise ValueError(f"events per child must be >= 1, got {per_child}")
+    return [keys[i:i + per_child] for i in range(0, len(keys), per_child)]
+
+
+def child_panels(panels: List[str], per_child: int, index: int) -> List[str]:
+    """The panel keys array child `index` evaluates (manifest order)."""
+    n_children = -(-len(panels) // per_child)
+    if index < 0 or index >= n_children:
+        raise SystemExit(f"array index {index} out of range ({n_children} children of {per_child})")
+    return panels[index * per_child:(index + 1) * per_child]
 
 
 def _constructions(args) -> Optional[List[str]]:
@@ -432,17 +554,46 @@ def cmd_plan(args) -> int:
     s3io = S3IO(profile=args.profile)
     dates = args.dates.split(",") if args.dates else None
     keys = list_panels(s3, dates)
+    peer_source = getattr(args, "peer_source", None)
+    if peer_source == "corr":
+        # covered reporters only (user decision 2026-10-11: drop events without a hardcoded set)
+        import re
+        ev = s3io.read_parquet(f"s3://{_bucket()}/{EVENTS_PEERS_KEY}")      # polars frame: event_id, reporter, ...
+        covered = covered_event_ids(ev.select("event_id", "reporter").unique(), corr_peersets())
+        pat = re.compile(r"event_(\d+)\.parquet$")
+        before = len(keys)
+        keys = [k for k in keys if (m := pat.search(k)) and int(m.group(1)) in covered]
+        print(f"peer_source=corr: {len(keys)} of {before} panels have a covered reporter", file=sys.stderr)
+    elif peer_source:
+        raise SystemExit(f"unknown --peer-source {peer_source!r}")
+    if getattr(args, "only_errors", False):
+        # re-run only the events whose shard is an error row (throttled panel reads etc.);
+        # their shards are overwritten, then consolidate_shards runs again
+        import re
+        tbl = s3io.read_parquet(f"s3://{_bucket()}/{args.s3_prefix}/shards_consolidated/shards.parquet")
+        bad = set(tbl.filter(tbl["status"] == "error")["event_id"].to_list())
+        pat = re.compile(r"event_(\d+)\.parquet$")
+        before = len(keys)
+        keys = [k for k in keys if (m := pat.search(k)) and int(m.group(1)) in bad]
+        print(f"only_errors: {len(keys)} of {before} panels have an error shard ({len(bad)} error events in the table)", file=sys.stderr)
     n = len(keys)
-    # Batch caps an array at 10,000 children -> chunk the manifest
+    # events per array child (sizing rule) -> children; Batch caps an array at
+    # 10,000 children -> chunk the manifest by CHILDREN, panels stay flat and
+    # child i reads panels[i*per_child:(i+1)*per_child] (child_panels)
+    per_child = int(getattr(args, "events_per_child", None) or EVENTS_PER_CHILD)
+    children = pack_panels(keys, per_child)
     CHUNK = 10_000
-    chunks = [keys[i:i + CHUNK] for i in range(0, n, CHUNK)] or [[]]
+    child_chunks = [children[i:i + CHUNK] for i in range(0, len(children), CHUNK)] or [[]]
+    chunks = [[k for child in cc for k in child] for cc in child_chunks]
     tag = dates[0] if dates else "all"
     manifest_keys = []
     for ci, chunk in enumerate(chunks):
         mk = f"{args.s3_prefix}/manifests/manifest_{tag}_{n}_part{ci}.json"
         s3io.write_text(json.dumps({"panels": chunk, "s3_prefix": args.s3_prefix,
                                     "charts": not args.no_charts,
-                                    "constructions": _constructions(args)}, indent=2),
+                                    "constructions": _constructions(args),
+                                    "peer_source": peer_source,
+                                    "per_child": per_child}, indent=2),
                         f"s3://{_bucket()}/{mk}")
         manifest_keys.append(mk)
     if n == 0:
@@ -450,24 +601,28 @@ def cmd_plan(args) -> int:
                           "submitted": False}))
         return 0
     if args.dry_run:
-        print(json.dumps({"manifests": manifest_keys, "event_count": n,
-                          "submitted": False, "dry_run": True}, indent=2))
+        print(json.dumps({"manifests": manifest_keys, "event_count": n, "per_child": per_child,
+                          "children": len(children), "submitted": False, "dry_run": True}, indent=2))
         return 0
     batch = session.client("batch", region_name=settings.get("aws", "region"))
     eval_job_ids = []
-    for mk, chunk in zip(manifest_keys, chunks):
+    for mk, cc in zip(manifest_keys, child_chunks):
+        cmd = ["eval-event", "--manifest", mk]
+        extra = {"arrayProperties": {"size": len(cc)}} if len(cc) > 1 else {}
+        if len(cc) == 1:                       # Batch arrays need >= 2 children: plain job, index 0
+            cmd += ["--index", "0"]
         resp = batch.submit_job(
-            jobName=f"basket-study-eval-{len(chunk)}",
+            jobName=f"basket-study-eval-{len(cc)}x{per_child}",
             jobQueue=settings.get("batch", "job_queue"),
             jobDefinition=settings.get("batch", "job_definition"),
-            arrayProperties={"size": len(chunk)},
-            containerOverrides=settings.job_overrides(
-                "basket_study", ["eval-event", "--manifest", mk]),
+            containerOverrides=settings.job_overrides("basket_study", cmd),
+            **extra,
         )
         eval_job_ids.append(resp["jobId"])
-    out = {"manifests": manifest_keys, "event_count": n, "submitted": True,
+    out = {"manifests": manifest_keys, "event_count": n, "per_child": per_child,
+           "children": len(children), "submitted": True,
            "job_ids": eval_job_ids, "job_queue": settings.get("batch", "job_queue"),
-           "constructions": _constructions(args)}
+           "constructions": _constructions(args), "peer_source": peer_source}
     if args.aggregate:
         # aggregation fan-out: one array child PER EXIT MARK (intraday marks
         # + close; index -> exit via --mark auto), dependent on the eval
@@ -507,36 +662,55 @@ def cmd_plan(args) -> int:
 
 
 def cmd_eval_event(args) -> int:
-    """Batch array child: one panel = manifest.panels[AWS_BATCH_JOB_ARRAY_INDEX].
-    Writes the event bundle + its own parquet shard (no cross-child merge —
-    aggregation globs .../results/shards/*.parquet)."""
+    """Batch array child: evaluates manifest.panels[i*per_child:(i+1)*per_child]
+    (i = AWS_BATCH_JOB_ARRAY_INDEX, or --index for a single-child plain job;
+    per_child = 1 for legacy manifests). Writes one event bundle + one parquet
+    shard PER EVENT (aggregation globs .../results/shards/*.parquet). A panel
+    that raises becomes an error shard (status 'error') and the child goes on
+    with the rest of its slice."""
     import json
     import os
+    import re
     from s3io import S3IO
     import polars as pl_
 
-    idx = os.environ.get("AWS_BATCH_JOB_ARRAY_INDEX")
+    idx = getattr(args, "index", None)
     if idx is None:
-        raise SystemExit("eval-event requires AWS_BATCH_JOB_ARRAY_INDEX")
+        idx = os.environ.get("AWS_BATCH_JOB_ARRAY_INDEX")
+    if idx is None:
+        raise SystemExit("eval-event requires AWS_BATCH_JOB_ARRAY_INDEX (or --index)")
     s3io = S3IO(profile=args.profile)
     m = json.loads(s3io.read_bytes(f"s3://{_bucket()}/{args.manifest}"))
     panels, s3_prefix = m["panels"], m["s3_prefix"]
+    per_child = int(m.get("per_child", 1))
     i = int(idx)
-    if i >= len(panels):
-        raise SystemExit(f"array index {i} out of range ({len(panels)} panels)")
+    mine = child_panels(panels, per_child, i)
 
+    from botocore.config import Config
     session = _session(args.profile)
-    s3 = session.client("s3")
-    panel = pd.read_parquet(io.BytesIO(
-        s3.get_object(Bucket=_bucket(), Key=panels[i])["Body"].read()))
-    t = process_panel(panel, s3io, Path(args.report_dir), s3_prefix,
-                      charts=m.get("charts", True),
-                      constructions=m.get("constructions"))
-    event_id = int(t["event_id"].iloc[0])
-    s3io.write_parquet(pl_.from_pandas(t),
-                       f"s3://{_bucket()}/{s3_prefix}/shards/event_{event_id}.parquet")
-    print(json.dumps({"index": i, "event_id": event_id, "rows": len(t),
-                      "panel": panels[i]}))
+    s3 = session.client("s3", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
+    pat = re.compile(r"event_(\d+)\.parquet$")
+    done, errors = [], 0
+    for key in mine:
+        try:
+            panel = read_panel(s3, key)
+            t = process_panel(panel, s3io, Path(args.report_dir), s3_prefix,
+                              charts=m.get("charts", True),
+                              constructions=m.get("constructions"),
+                              peer_source=m.get("peer_source"))
+            event_id = int(t["event_id"].iloc[0])
+        except Exception as e:                  # one bad panel must not sink the slice
+            mm = pat.search(key)
+            event_id = int(mm.group(1)) if mm else -1
+            t = pd.DataFrame([{"event_id": event_id, "status": "error", "skip_reason": repr(e)[:2000]}]
+                             ).reindex(columns=CSV_COLUMNS).astype(CSV_DTYPES)
+            errors += 1
+            print(json.dumps({"index": i, "panel": key, "error": repr(e)[:500]}), flush=True)
+        s3io.write_parquet(pl_.from_pandas(t),
+                           f"s3://{_bucket()}/{s3_prefix}/shards/event_{event_id}.parquet")
+        done.append({"event_id": event_id, "rows": int(len(t)), "panel": key})
+    print(json.dumps({"index": i, "per_child": per_child, "events": len(done), "errors": errors,
+                      "shards": done}))
     return 0
 
 
@@ -700,10 +874,64 @@ def cmd_aggregate(args) -> int:
     return 0
 
 
+# Producers that `evaluate.py produce <name> [args...]` may run inside the
+# image (the Dockerfile's ENTRYPOINT is `python evaluate.py`, so a Batch
+# command override cannot name another script). Each has a main() that parses
+# sys.argv; the user's rule (2026-10-06/09) is that every pass over the shards
+# runs on Batch, the laptop only submits (submit_producers.py).
+PRODUCERS = ("portfolio_analysis", "excursion_stats", "stop_sim", "utilization_buckets", "corr_vs_llm",
+             "adv_cap", "adv_cap_oos", "reporter_marks", "consolidate_shards", "holding_periods", "reconcile_v2_shards")
+
+
+def cmd_produce(argv: list) -> int:
+    """argv = [producer, *producer_args]. Re-homes sys.argv and calls the
+    producer's main(). LOAD_OK_STRICT=1 makes finalize_local.load_ok raise
+    instead of falling back to the multi-hour shard-glob scan: a child that
+    cannot read the consolidated table must fail fast, not burn the queue."""
+    import importlib
+    import os
+    if not argv or argv[0] not in PRODUCERS:
+        raise SystemExit(f"produce: need one of {PRODUCERS}, got {argv[:1]}")
+    name, rest = argv[0], argv[1:]
+    os.environ.setdefault("LOAD_OK_STRICT", "1")
+    mod = importlib.import_module(name)
+    sys.argv = [f"{name}.py", *rest]
+    print(f"produce {name} {' '.join(rest)} (image code_version {_code_version()!r})", flush=True)
+    rc = mod.main()
+    return 0 if rc is None else int(rc)
+
+
+def cmd_test(argv: list) -> int:
+    """`test --src s3://.../src.zip [pytest args]`: run the basket-study pytest suite INSIDE this image
+    on Batch (user policy 2026-10-10: tests never run on the laptop). The zip (the package incl. tests/
+    and fixtures) is unpacked to /tmp/src and pytest runs in a FRESH interpreter with cwd + PYTHONPATH
+    there, so the zip's modules are the ones under test (this process already imported the image's
+    construction/, rules/, spy_bars at module level, so an in-process pytest.main would see /app's copies).
+    No rebuild is needed per test cycle. Submitted by scripts/batch_test.py --pkg earnings_basket_study."""
+    import os
+    import subprocess
+    import zipfile
+    import boto3
+    i = argv.index("--src")
+    src = argv[i + 1]
+    rest = argv[:i] + argv[i + 2:]
+    b, k = src.replace("s3://", "").split("/", 1)
+    data = boto3.client("s3").get_object(Bucket=b, Key=k)["Body"].read()
+    zipfile.ZipFile(io.BytesIO(data)).extractall("/tmp/src")
+    args = rest or ["tests", "-q"]
+    print(f"pytest {args} on {src} ({len(data)} B) in /tmp/src", flush=True)
+    env = dict(os.environ, PYTHONPATH="/tmp/src")
+    return subprocess.call([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", *args], cwd="/tmp/src", env=env)
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "produce":
+        return cmd_produce(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        return cmd_test(sys.argv[2:])
     ap = argparse.ArgumentParser()
     ap.add_argument("command", nargs="?", default="run",
-                    choices=["run", "plan", "eval-event", "aggregate", "plan-sentiment", "eval-model"])
+                    choices=["run", "plan", "eval-event", "aggregate", "plan-sentiment", "eval-model",
+                             "extract-peers", "produce"])
     ap.add_argument("--dates", default=None, help="comma-separated panel dates; default all")
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "results" / "results_v1.parquet"))
     ap.add_argument("--report-dir", default=str(Path(__file__).resolve().parent / "results" / "events"),
@@ -718,8 +946,20 @@ def main():
                          "Unhedged names (reporter_only) emit one row per event under "
                          f"universe {UNHEDGED_UNIVERSE!r}. Carried in the manifest to array children.")
     ap.add_argument("--manifest", default=None, help="eval-event: manifest S3 key")
+    ap.add_argument("--index", type=int, default=None,
+                    help="eval-event: child index (default AWS_BATCH_JOB_ARRAY_INDEX)")
+    ap.add_argument("--events-per-child", type=int, default=None,
+                    help=f"plan: panels per array child (default {EVENTS_PER_CHILD}; sizing rule: a child "
+                         "must run >= 1 min and <= 10 min, measure on a smoke)")
+    ap.add_argument("--peer-source", default=None, choices=[None, "corr"],
+                    help="plan: 'corr' = the corr-peer arm — hedge legs from rules/corr_peersets_top10.csv "
+                         "(bars attached from the universe store), hedged constructions under universe 'corr' only, "
+                         "manifest restricted to events whose reporter has a set. Carried in the manifest.")
     ap.add_argument("--dry-run", action="store_true",
                     help="plan: write the manifest but do not submit the job")
+    ap.add_argument("--only-errors", action="store_true",
+                    help="plan: only the events whose row in <s3-prefix>/shards_consolidated/shards.parquet has "
+                         "status 'error' (re-run after throttling); re-consolidate afterwards")
     ap.add_argument("--aggregate", action="store_true",
                     help="plan: chain the aggregation mark-array + finalize "
                          "after the eval array (dependsOn)")
@@ -774,6 +1014,11 @@ def main():
         if not args.manifest:
             raise SystemExit("eval-model requires --manifest")
         return cmd_eval_model(args)
+    if args.command == "extract-peers":
+        # event x peer extract of the run under --s3-prefix (its manifests
+        # define the event set); see extract_events_peers.py
+        import extract_events_peers
+        return extract_events_peers.main_from_args(args, _bucket())
     return cmd_run(args)
 
 

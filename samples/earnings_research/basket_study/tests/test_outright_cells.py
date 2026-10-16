@@ -32,10 +32,20 @@ def test_cells_end_with_extra_and_pooled_excludes_it():
     assert cs[25] == ("reporter_only", "none", ["reporter_only"], ["none"])
     pooled = next(x for x in cs if x[0] == "POOLED" and x[1] == "POOLED")
     assert "reporter_only" not in pooled[2] and "none" not in pooled[3]
-    assert len(cs) == 25 + len(pa.EXTRA_CELLS) and len(pa.EXTRA_CELLS) == 4
-    assert [x[:2] for x in cs[-3:]] == [("spy_beta_levels_neutral", "SPY"), ("spy_beta_returns_neutral", "SPY"),
-                                        ("spy_dollar_neutral", "SPY")]
+    assert len(cs) == 25 + len(pa.EXTRA_CELLS) and len(pa.EXTRA_CELLS) == 8
+    assert [x[:2] for x in cs[26:29]] == [("spy_beta_levels_neutral", "SPY"), ("spy_beta_returns_neutral", "SPY"),
+                                          ("spy_dollar_neutral", "SPY")]
     assert "SPY" not in pooled[3]
+
+
+def test_corr_cells_are_extra_cells_outside_pooled():
+    """Corr-peer arm (2026-10-11): the four hedged constructions on the hardcoded
+    correlation peer sets are extra cells under universe 'corr' — never in any POOLED."""
+    cs = list(pa.cells())
+    assert [x[:2] for x in cs[-4:]] == [(c, "corr") for c in pa.CONS]
+    assert all(x[2:] == ([x[0]], ["corr"]) for x in cs[-4:])
+    for c, u, mc, mu in cs[:25]:
+        assert "corr" not in mu
 
 
 def test_cell_masks_keep_outright_out_of_pooled():
@@ -95,4 +105,17 @@ def test_n_events_by_cell_keeps_grid_count_hedged_only():
                                     "universe": "SPY", "pnl": 0.0}])], ignore_index=True)
     n_hedged, n_extra = pa.n_events_by_cell(sub)
     assert n_hedged == 1                      # event 9 has no hedged row -> not counted for the grid
-    assert n_extra == {"reporter_only": 2, "spy_dollar_neutral": 1}
+    assert n_extra == {("reporter_only", "none"): 2, ("spy_dollar_neutral", "SPY"): 1}
+
+
+def test_n_events_by_cell_keys_corr_cells_by_cell_not_construction():
+    """A corr row shares its construction name with the grid, so extras are keyed by (construction, universe)."""
+    sub = pd.concat([_rows("2026-06-10", 0.01, -0.05),
+                     pd.DataFrame([{"event_id": 9, "trade_day": "2026-06-10", "construction": "ridge_levels_beta_neutral",
+                                    "universe": "corr", "pnl": 0.0},
+                                   {"event_id": 1, "trade_day": "2026-06-10", "construction": "ridge_levels_beta_neutral",
+                                    "universe": "corr", "pnl": 0.0}])], ignore_index=True)
+    n_hedged, n_extra = pa.n_events_by_cell(sub)
+    assert n_hedged == 1                      # event 9 only has a corr row
+    assert n_extra[("ridge_levels_beta_neutral", "corr")] == 2
+    assert n_extra[("reporter_only", "none")] == 1
