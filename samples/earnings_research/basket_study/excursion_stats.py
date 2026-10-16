@@ -160,7 +160,7 @@ def main():
     print(f"groups {groups.shape}, touch {touch.shape}", flush=True)
     if args.write:
         import polars as pl
-        pa = f"s3://{settings.get("s3", "data_bucket")}/{args.s3_prefix}/portfolio_analysis{fee_suffix(args.fee_per_share)}"
+        pa = f"s3://{settings.get('s3', 'data_bucket')}/{args.s3_prefix}/portfolio_analysis{fee_suffix(args.fee_per_share)}"
         s3io.write_parquet(pl.from_pandas(groups), f"{pa}/excursion_groups.parquet")
         s3io.write_parquet(pl.from_pandas(touch), f"{pa}/excursion_touch.parquet")
         print(f"uploaded {pa}/excursion_{{groups,touch}}.parquet")

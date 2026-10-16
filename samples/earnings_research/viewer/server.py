@@ -293,12 +293,15 @@ def main():
     ap.add_argument("--profile", default=None, help="AWS profile (default: settings aws.profile)")
     ap.add_argument("--bucket", default=None, help="results bucket (default: settings s3.data_bucket)")
     ap.add_argument("--open", action="store_true", help="open the browser")
+    ap.add_argument("--study10y-base", default=None,
+                    help="/study10y results prefix (default earnings-basket-study/results-10y/; "
+                         "earnings-basket-study/results-10y-h5/ carries the day-2..5 exits)")
     args = ap.parse_args()
     args.profile = args.profile or settings.get("aws", "profile")
     _bucket = args.bucket or settings.get("s3", "data_bucket")
     session = boto3.Session(profile_name=args.profile) if args.profile else boto3.Session()
     _s3 = session.client("s3")
-    study10y.init(get_object)
+    study10y.init(get_object, base=args.study10y_base)
     srv =ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}/"
     print(f"results browser: {url} (bucket {_bucket}, profile {args.profile})", flush=True)

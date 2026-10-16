@@ -145,7 +145,7 @@ def main():
     print(f"stop_sim stats {stats.shape}, daily files {len(dailies)}", flush=True)
     if args.write:
         import polars as pl
-        pa = f"s3://{settings.get("s3", "data_bucket")}/{args.s3_prefix}/portfolio_analysis{fee_suffix(args.fee_per_share)}"
+        pa = f"s3://{settings.get('s3', 'data_bucket')}/{args.s3_prefix}/portfolio_analysis{fee_suffix(args.fee_per_share)}"
         s3io.write_parquet(pl.from_pandas(stats), f"{pa}/stop_sim_stats.parquet")
         for (code, lvl), df in dailies.items():
             s3io.write_parquet(pl.from_pandas(df), f"{pa}/by_exit/{code}/daily_returns_stop{lvl}.parquet")

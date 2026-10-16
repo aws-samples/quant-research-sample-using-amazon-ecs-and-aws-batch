@@ -32,8 +32,9 @@ Outputs under <s3-prefix>/portfolio_analysis/:
       (counts over HIST_LO..HIST_HI step HIST_W bps, + n_under / n_over).
       POOLED = union of the member cells' trades. Independent of the SPY leg.
 
-  portfolio_stats columns: scope, construction, universe, portfolio, n_events,
-      sharpe, ann_ret_pct, total_pct, max_dd_pct, p2t_days, p2r_days, recovered,
+  portfolio_stats columns: scope, construction, universe, portfolio, n_events
+      (events in the scope's hedged grid; extra cells count their own), n_trades
+      (ok trade rows in the cell, POOLED = sum of members), sharpe, ann_ret_pct, total_pct, max_dd_pct, p2t_days, p2r_days, recovered,
       longest_p2r_days, longest_dd_depth_pct, longest_dd_trough, longest_recovered,
       beat_spy_pct (% of the 2,571 trade days with r_port > r_SPY; for the SPY
       overlays this equals the share of days the strategy leg is positive)
@@ -77,7 +78,7 @@ UNIS = list(aggregate.UNIV_STYLE)
 LABELS = {"midlarge": "MID+LARGE", "midsmall": "MID+SMALL", "mid": "MID", "large": "LARGE",
           "exlarge": "EX-LARGE", "ndx": "NDX", "spx": "SPX", "ndxspx": "NDX+SPX",
           "rui": "R1000", "rut": "R2000", "rua": "R3000", "sptm": "SP1500", "sec7": "SEC-7"}
-STAT_COLS = ["scope", "construction", "universe", "portfolio", "n_events", "sharpe",
+STAT_COLS = ["scope", "construction", "universe", "portfolio", "n_events", "n_trades", "sharpe",
              "ann_ret_pct", "total_pct", "max_dd_pct", "p2t_days", "p2r_days", "recovered",
              "longest_p2r_days", "longest_dd_depth_pct", "longest_dd_trough", "longest_recovered",
              "beat_spy_pct",      # % of trade days with r_port > r_SPY (no-trade days count as 0)
@@ -93,7 +94,13 @@ def exit_code(col: str) -> str:
 
 
 def exit_label(col: str) -> str:
-    return "close" if col == "pnl" else f"{int(col[4:6])}:{col[6:8]}"
+    """pnl -> close; pnl_HHMM -> H:MM; pnl_dN -> 'day N close' (multi-day holds, 2026-10-12)."""
+    if col == "pnl":
+        return "close"
+    code = exit_code(col)
+    if code.startswith("d") and code[1:].isdigit():
+        return f"day {int(code[1:])} close"
+    return f"{int(col[4:6])}:{col[6:8]}"
 
 
 def scopes():
@@ -176,26 +183,27 @@ def daily_multi(sub: pd.DataFrame, exits: list) -> dict:
     return out
 
 
-# Unhedged cells (README decision #7, 2026-09-24): reported as their own row,
-# NEVER a member of any POOLED average — POOLED stays the mean of the 4 x 4
-# hedged grid, so every pre-existing number is unchanged when these rows are
-# unioned in (finalize_local.load_ok(extra=...)).
+# Extra cells (README decisions #7/#8/#10): reported as their own row, NEVER a
+# member of any POOLED average — POOLED stays the mean of the 4 x 4 hedged grid,
+# so every pre-existing number is unchanged when these rows are unioned in
+# (finalize_local.load_ok(extra=...)). The unhedged cells carry their own
+# construction names under a pseudo-universe; the corr-peer arm (2026-10-11)
+# reuses the four hedged constructions under universe "corr" (hardcoded
+# correlation peer sets), so extras are identified by (construction, universe).
 EXTRA_CELLS = [("reporter_only", "none"),
                ("spy_beta_levels_neutral", "SPY"), ("spy_beta_returns_neutral", "SPY"),
-               ("spy_dollar_neutral", "SPY")]
-
-
-EXTRA_CONS = [c for c, _ in EXTRA_CELLS]
+               ("spy_dollar_neutral", "SPY")] + [(c, "corr") for c in CONS]
 
 
 def n_events_by_cell(sub: pd.DataFrame):
-    """(n_events of the hedged grid, {extra construction: its own n_events}).
+    """(n_events of the hedged grid, {(construction, universe) of an extra cell: its own n_events}).
     The grid's count is over hedged rows only, so unioning extra cells leaves
     every pre-existing n_events unchanged; each extra cell counts its own events."""
-    is_extra = sub["construction"].isin(EXTRA_CONS).to_numpy()
+    cell = pd.MultiIndex.from_arrays([sub["construction"], sub["universe"]])
+    is_extra = cell.isin(EXTRA_CELLS)
     n_hedged = int(sub.loc[~is_extra, "event_id"].nunique())
-    n_extra = {c: int(g["event_id"].nunique())
-               for c, g in sub[is_extra].groupby("construction", observed=True)}
+    n_extra = {(c, u): int(g["event_id"].nunique())
+               for (c, u), g in sub[is_extra].groupby(["construction", "universe"], observed=True)}
     return n_hedged, n_extra
 
 
@@ -313,6 +321,8 @@ def build(ok: pd.DataFrame, spy: pd.DataFrame, profile=None, exits=None):
         print(f"  {label:10s} {n_events:7d} events" + (f" + extra {n_extra}" if n_extra else ""), flush=True)
         if not len(sub):
             continue
+        n_trades = {(c, u): int(m.sum()) for c, u, m in
+                    cell_masks(sub["construction"].to_numpy(), sub["universe"].to_numpy())}
         dm = daily_multi(sub, exits)
         for col in exits:
             code, elabel = exit_code(col), exit_label(col)
@@ -325,7 +335,8 @@ def build(ok: pd.DataFrame, spy: pd.DataFrame, profile=None, exits=None):
                     series[(c, u, pname)] = r
                     stat_rows.append({"exit": code, "exit_label": elabel, "scope": label,
                                       "construction": c, "universe": u, "portfolio": pname,
-                                      "n_events": float(n_extra.get(c, n_events)), **stats_for(r, spy_bh)})
+                                      "n_events": float(n_extra.get((c, u), n_events)),
+                                      "n_trades": float(n_trades.get((c, u), 0)), **stats_for(r, spy_bh)})
             frame = pd.DataFrame(series)
             frame.columns = pd.MultiIndex.from_tuples(series.keys(),
                                                       names=["construction", "universe", "portfolio"])
@@ -341,7 +352,7 @@ def build(ok: pd.DataFrame, spy: pd.DataFrame, profile=None, exits=None):
     for col in exits:
         stat_rows.append({"exit": exit_code(col), "exit_label": exit_label(col), "scope": "SPY",
                           "construction": "-", "universe": "-", "portfolio": "SPY buy&hold",
-                          "n_events": np.nan, **spy_stats})
+                          "n_events": np.nan, "n_trades": np.nan, **spy_stats})
     stats = pd.DataFrame(stat_rows)[["exit", "exit_label"] + STAT_COLS]
     months = pd.concat(month_frames, ignore_index=True)[["exit", "exit_label"] + MONTH_COLS]
     dailies = {}
@@ -468,7 +479,7 @@ def main():
     s3io = S3IO(profile=args.profile)
     ok = load_ok(s3io, args.s3_prefix, args.cache, fee_per_share=args.fee_per_share,
                  extra=args.extra_shards or ())
-    pa = f"s3://{settings.get("s3", "data_bucket")}/{args.s3_prefix}/portfolio_analysis{suffix}"
+    pa = f"s3://{settings.get('s3', 'data_bucket')}/{args.s3_prefix}/portfolio_analysis{suffix}"
     util = build_utilization(ok, profile=args.profile)
     print(f"daily utilization {util.shape} (basket cap {aggregate.MAX_BASKET_WEIGHT:.0%})", flush=True)
     if args.utilization_only:

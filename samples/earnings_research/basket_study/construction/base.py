@@ -23,6 +23,9 @@ import pandas as pd
 from rules.sessions import RTH_END_MIN, RTH_START_MIN
 
 UNIVERSES = ("all", "pure play", "functional", "correlated")
+# Universes accepted by universe_symbols but NOT part of the default 4 x 4 grid: the corr-peer
+# arm (corr_peers_bars.CORR_UNIVERSE) runs the hedged constructions against this bucket alone.
+EXTRA_UNIVERSES = ("corr",)
 
 # Basket-admission floor: peers present in fewer than this fraction of the
 # pre-event RTH union minutes are inadmissible for EVERY construction — too
@@ -81,7 +84,7 @@ def admissible_peers(bars: pd.DataFrame, peers: Dict[str, List[str]],
 
 def universe_symbols(peers: Dict[str, List[str]], universe: str,
                      reporter: str) -> List[str]:
-    if universe not in UNIVERSES:
+    if universe not in UNIVERSES and universe not in EXTRA_UNIVERSES:
         raise ValueError(f"unknown universe {universe!r}")
     if universe == "all":
         syms = [s for v in peers.values() for s in v]

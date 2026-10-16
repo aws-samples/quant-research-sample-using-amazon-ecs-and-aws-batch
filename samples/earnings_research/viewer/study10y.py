@@ -27,16 +27,19 @@ Portfolio model (aggregate.py --spy-weight w --strategy-leverage L):
 basket is unwound on the trade day (9:31 .. 15:30 marks or the RTH close).
 """
 
+import datetime
 import html
 import io
 import json
 import math
+from concurrent.futures import ThreadPoolExecutor
 
+import numpy as np
 import pandas as pd
 
 BASE = "earnings-basket-study/results-10y/"
 PA = BASE + "portfolio_analysis/"            # study default cap (2% per basket)
-CAPS = [2, 3, 4, 5, 10, 15, 20, 25]          # per-basket capital caps with a portfolio_analysis run
+CAPS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 25]   # per-basket caps with a portfolio_analysis run (1% steps 2-15, user 2026-10-09)
 DEFAULT_CAP = 2
 
 
@@ -59,7 +62,8 @@ PORTFOLIO_WL = {"strat": (0.0, 1.0), "spy1_strat1": (1.0, 1.0), "spy1_strat2": (
 # exit marks present in the shards: (code used in files/URLs, label)
 EXITS = ([(f"09{m}", f"9:{m}") for m in ("31", "32", "33", "34", "35")]
          + [(f"{h:02d}{m}", f"{h}:{m}") for h in range(10, 16) for m in ("00", "30")]
-         + [("close", "close")])
+         + [("close", "close")]
+         + [(f"d{k}", f"day {k} close") for k in (2, 3, 4, 5)])      # multi-day holds (2026-10-12)
 EXIT_LABEL = dict(EXITS)
 DEFAULT_EXIT = "close"
 
@@ -111,6 +115,13 @@ SCOPES = [  # (key, label, group) — keys match portfolio_analysis 'scope'
     ("PX1+", "$1 and up", "Reporter price, cumulative"),
     ("PX5+", "$5 and up", "Reporter price, cumulative"),
     ("PX10+", "$10 and up", "Reporter price, cumulative"),
+    ("PX15+", "$15 and up", "Reporter price, cumulative"),
+    ("PX20+", "$20 and up", "Reporter price, cumulative"),
+    ("PX25+", "$25 and up", "Reporter price, cumulative"),
+    ("PX30+", "$30 and up", "Reporter price, cumulative"),
+    ("PX35+", "$35 and up", "Reporter price, cumulative"),
+    ("PX40+", "$40 and up", "Reporter price, cumulative"),
+    ("PX45+", "$45 and up", "Reporter price, cumulative"),
     ("PX50+", "$50 and up", "Reporter price, cumulative"),
 ]
 # Hedged grid: (POOLED + 4 constructions) x (POOLED + 4 peer universes). Extra
@@ -118,14 +129,18 @@ SCOPES = [  # (key, label, group) — keys match portfolio_analysis 'scope'
 # pseudo-universe each and are never part of POOLED:
 #   reporter_only            -> "none"  (outright reporter, no hedge)
 #   spy_beta_levels_neutral, spy_beta_returns_neutral, spy_dollar_neutral -> "SPY"
+# The corr-peer arm (README #10, 2026-10-11) is the four hedged constructions on
+# hardcoded correlation peer sets under universe "corr": a POOLED construction
+# over it is their mean, but "corr" is never a member of the POOLED universe.
 CONSTRUCTIONS = ["POOLED", "equal_weight_dollar_neutral", "ridge_returns_beta_neutral",
                  "ridge_returns_dollar_neutral", "ridge_levels_beta_neutral", "reporter_only",
                  "spy_beta_levels_neutral", "spy_beta_returns_neutral", "spy_dollar_neutral"]
-UNIVERSES = ["POOLED", "all", "correlated", "functional", "pure play", "none", "SPY"]
+UNIVERSES = ["POOLED", "all", "correlated", "functional", "pure play", "corr", "none", "SPY"]
+EXTRA_UNIS = ["corr"]                         # hedged-construction universes outside POOLED
 UNHEDGED = {"reporter_only": "none",          # construction -> its sole pseudo-universe
             "spy_beta_levels_neutral": "SPY", "spy_beta_returns_neutral": "SPY", "spy_dollar_neutral": "SPY"}
 HEDGED_CONS = [c for c in CONSTRUCTIONS[1:] if c not in UNHEDGED]
-HEDGED_UNIS = [u for u in UNIVERSES[1:] if u not in UNHEDGED.values()]
+HEDGED_UNIS = [u for u in UNIVERSES[1:] if u not in UNHEDGED.values() and u not in EXTRA_UNIS]
 
 
 def coerce_cell(construction, universe):
@@ -150,9 +165,14 @@ _get = None          # bytes-for-key callable, injected by server.py
 _cache = {}
 
 
-def init(get_object):
-    global _get
+def init(get_object, base: str = None):
+    """base: alternative results prefix, e.g. the h5 pass (results-10y-h5/) whose
+    producers carry the day-2..5 exits (server.py --study10y-base)."""
+    global _get, BASE, PA
     _get = get_object
+    if base:
+        BASE = base if base.endswith("/") else base + "/"
+        PA = BASE + "portfolio_analysis/"
 
 
 def _parquet(key):
@@ -161,14 +181,51 @@ def _parquet(key):
     return _cache[key]
 
 
+def _read_indexed(raw):
+    """parquet bytes with a trade_day column -> frame indexed by DatetimeIndex trade_day."""
+    df = pd.read_parquet(io.BytesIO(raw))
+    df["trade_day"] = pd.to_datetime(df["trade_day"])
+    return df.set_index("trade_day")
+
+
+def _daily_key(exit_code, cap=DEFAULT_CAP, fee=DEFAULT_FEE):
+    return _pa(cap, fee) + f"by_exit/{exit_code}/daily_returns.parquet"
+
+
+def _util_key(cap=DEFAULT_CAP):
+    return _pa(cap) + "daily_utilization.parquet"
+
+
+def _stop_key(exit_code, lvl, fee=DEFAULT_FEE):
+    return _pa(DEFAULT_CAP, fee) + f"by_exit/{exit_code}/daily_returns_stop{lvl}.parquet"
+
+
+def _prefetch(keys):
+    """Load trade_day-indexed parquet files concurrently (8 threads). Only the main
+    thread writes _cache (after the futures complete); S3 misses are skipped, not cached."""
+    todo = [k for k in dict.fromkeys(keys) if k not in _cache]
+    if not todo:
+        return
+
+    def load(k):
+        try:
+            return k, _read_indexed(_get(k))
+        except Exception:
+            return k, None
+
+    with ThreadPoolExecutor(8) as ex:
+        results = list(ex.map(load, todo))
+    for k, df in results:
+        if df is not None:
+            _cache[k] = df
+
+
 def _daily(exit_code, cap=DEFAULT_CAP, fee=DEFAULT_FEE):
     """Daily strategy returns of every real cell of every scope at one exit
     (columns 'SCOPE|construction|universe' + spy_buy_hold), indexed by day."""
-    key = _pa(cap, fee) + f"by_exit/{exit_code}/daily_returns.parquet"
+    key = _daily_key(exit_code, cap, fee)
     if key not in _cache:
-        df = pd.read_parquet(io.BytesIO(_get(key)))
-        df["trade_day"] = pd.to_datetime(df["trade_day"])
-        _cache[key] = df.set_index("trade_day")
+        _cache[key] = _read_indexed(_get(key))
     return _cache[key]
 
 
@@ -195,11 +252,9 @@ MAX_BASKET_WEIGHT_PCT = 2        # study_config aggregation.max_basket_weight
 
 def _util(cap=DEFAULT_CAP):
     """Daily capital utilization per real cell of every scope (fraction), indexed by day."""
-    key = _pa(cap) + "daily_utilization.parquet"
+    key = _util_key(cap)
     if key not in _cache:
-        df = pd.read_parquet(io.BytesIO(_get(key)))
-        df["trade_day"] = pd.to_datetime(df["trade_day"])
-        _cache[key] = df.set_index("trade_day")
+        _cache[key] = _read_indexed(_get(key))
     return _cache[key]
 
 
@@ -235,12 +290,51 @@ def _stop_stats(fee=DEFAULT_FEE):
         return None
 
 
+UB_COLS = ["construction", "cell", "capital", "kind", "bucket", "days", "util_min_pct", "util_max_pct",
+           "trades"] + [f"{k}_{m}" for k in ("gross", "net")
+                        for m in ("sharpe", "ann_ret_pct", "max_dd_pct", "day_hit_pct", "trade_hit_pct")] + [
+    f"{b}_{k}{m}" for k in ("gross", "net")
+    for b, m in (("bench", "_sharpe"), ("null", "_p95_sharpe"), ("p", ""))]
+
+
+def _util_buckets():
+    """utilization_buckets.py output: ALL scope, close exit, 2% cap, 5 cells,
+    gross and IBKR Pro Fixed net per starting capital, with the standing benchmarks
+    (fixed, not selection-driven)."""
+    try:
+        df = _parquet(PA + "utilization_buckets.parquet")
+    except Exception:
+        return None
+    if "capital" not in df or "p_gross" not in df:
+        return None
+    return {"capitals": sorted(float(c) for c in df["capital"].unique()), "rows": _rows(df, UB_COLS)}
+
+
+AC_COLS = ["period", "scope", "construction", "cell", "capital", "basket_cap", "adv_pct", "adv_label", "trades", "deployed_pct",
+           "scaled_pct", "zero_pct", "median_scale", "gross_sharpe", "net_sharpe", "gross_ann_ret_pct",
+           "net_ann_ret_pct", "net_max_dd_pct", "net_ann_pnl_usd", "bench_net_sharpe",
+           "null_net_p95_sharpe", "p_net"]
+
+
+def _adv_cap():
+    """adv_cap.py output: every basket capped at a % of each leg's prior-20-session ADV,
+    per scope x capital x basket cap (fixed, not selection-driven)."""
+    try:
+        df = _parquet(PA + "adv_cap.parquet")
+    except Exception:
+        return None
+    if "period" not in df:
+        return None
+    return {"periods": ["full", "IS 2016-2021", "OOS 2022-2026"],
+            "scopes": list(dict.fromkeys(df["scope"].to_list())),
+            "capitals": sorted(float(c) for c in df["capital"].unique()),
+            "caps": sorted(float(c) for c in df["basket_cap"].unique()), "rows": _rows(df, AC_COLS)}
+
+
 def _daily_stop(exit_code, lvl, fee=DEFAULT_FEE):
-    key = _pa(DEFAULT_CAP, fee) + f"by_exit/{exit_code}/daily_returns_stop{lvl}.parquet"
+    key = _stop_key(exit_code, lvl, fee)
     if key not in _cache:
-        df = pd.read_parquet(io.BytesIO(_get(key)))
-        df["trade_day"] = pd.to_datetime(df["trade_day"])
-        _cache[key] = df.set_index("trade_day")
+        _cache[key] = _read_indexed(_get(key))
     return _cache[key]
 
 
@@ -310,8 +404,231 @@ def _rows(df, cols):
     return [{c: _clean(x) for c, x in zip(cols, rec)} for rec in df[cols].itertuples(index=False)]
 
 
+# -------------------------------------------------------------- date window
+TRADING_DAYS = 252
+TABLE_COLS = ["sharpe", "ann_ret_pct", "total_pct", "max_dd_pct", "beat_spy_pct", "n_events", "n_trades", "wiped_out"]
+WSTAT_KEYS = ["sharpe", "ann_ret_pct", "total_pct", "max_dd_pct", "p2t_days", "p2r_days", "recovered",
+              "beat_spy_pct", "wiped_out", "n_days"]
+
+
+def _iso(v):
+    """'' / None -> None; anything else must be an ISO date 'YYYY-MM-DD' (ValueError otherwise)."""
+    if v is None or v == "":
+        return None
+    return datetime.date.fromisoformat(str(v)).isoformat()
+
+
+def _window(df, start, end, strict=True):
+    """Slice a DatetimeIndex frame/series to [start, end] inclusive (either bound optional).
+    strict: an empty slice raises ValueError."""
+    idx = df.index
+    m = np.ones(len(idx), dtype=bool)
+    if start:
+        m &= np.asarray(idx >= pd.Timestamp(start))
+    if end:
+        m &= np.asarray(idx <= pd.Timestamp(end))
+    out = df.loc[m]
+    if strict and not len(out):
+        raise ValueError(f"no trade days in {start}..{end}")
+    return out
+
+
+def _window_label(idx):
+    return f"{idx[0]:%Y-%m-%d} -> {idx[-1]:%Y-%m-%d} ({len(idx):,} trade days)"
+
+
+def _window_stats(r: pd.Series, spy: pd.Series) -> dict:
+    """Daily-return statistics of one series, reproducing
+    earnings_basket_study/portfolio_analysis.stats_for (+ aggregate.sharpe /
+    drawdown_stats) without importing it."""
+    rv = r.to_numpy(dtype=float)
+    n = len(rv)
+    eq = np.cumprod(1 + rv)
+    wiped = bool((eq <= 0).any())
+    if wiped:
+        first = int(np.argmax(eq <= 0))
+        eq[first:] = 0.0
+    sd = float(rv.std(ddof=1)) if n >= 2 else float("nan")
+    sharpe = float(rv.mean() / sd * math.sqrt(TRADING_DAYS)) if n >= 2 and sd > 0 else None
+    eq_last = float(eq[-1])
+    peak = np.maximum.accumulate(eq)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        dd = eq / peak - 1.0
+    trough_i = int(np.argmin(dd))
+    peak_i = int(np.argmax(eq[:trough_i + 1]))
+    rec = np.nonzero(eq[trough_i:] >= peak[trough_i])[0]
+    recovered = len(rec) > 0
+    rec_i = trough_i + int(rec[0]) if recovered else n - 1
+    sv = spy.reindex(r.index).to_numpy(dtype=float)
+    out = {"sharpe": sharpe,
+           "ann_ret_pct": -100.0 if wiped else (eq_last ** (TRADING_DAYS / n) - 1) * 100,
+           "total_pct": (eq_last - 1) * 100,
+           "max_dd_pct": float(dd[trough_i]) * 100,
+           "p2t_days": trough_i - peak_i,
+           "p2r_days": (rec_i - peak_i) if recovered else None,
+           "recovered": bool(recovered),
+           "beat_spy_pct": float((rv > sv).mean()) * 100,
+           "wiped_out": wiped,
+           "n_days": n}
+    return {k: _clean(v) for k, v in out.items()}
+
+
+def _window_util(scope, construction, universe, cap, start, end):
+    """Window utilization of one panel + trades counted from utilization:
+    per real cell round(util x 100 / cap) summed over the window days, POOLED =
+    mean over member cells (rounded); n_trades_floor = some day hit 100%."""
+    none = {"util_avg_pct": None, "util_days_pct": None, "n_trades": None, "n_trades_floor": None}
+    try:
+        df = _util(cap)
+    except Exception:
+        return none
+    cons, unis = members(construction, universe)
+    cols = [f"{scope}|{c}|{u}" for c in cons for u in unis if f"{scope}|{c}|{u}" in df.columns]
+    if not cols:
+        return none
+    sub = _window(df[cols], start, end, strict=False)
+    if not len(sub):
+        return none
+    u = sub.mean(axis=1)
+    trades = (sub * 100 / cap).round().sum(axis=0)
+    return {"util_avg_pct": float(u.mean()) * 100, "util_days_pct": float((u > 0).mean()) * 100,
+            "n_trades": int(round(float(trades.mean()))),
+            "n_trades_floor": bool((sub.to_numpy(dtype=float) >= 1.0 - 1e-9).any())}
+
+
+def _window_row(daily, ident, scope, construction, universe, cap, start, end):
+    """One comparison-table row (same shape as data().wide) from a windowed daily file; None if absent."""
+    cons, unis = members(construction, universe)
+    cols = [f"{scope}|{c}|{u}" for c in cons for u in unis if f"{scope}|{c}|{u}" in daily.columns]
+    if not cols:
+        return None
+    try:
+        strat = _window(daily[cols].mean(axis=1), start, end)
+    except ValueError:
+        return None
+    spy = _window(daily["spy_buy_hold"], start, end)
+    wu = _window_util(scope, construction, universe, cap, start, end)
+    row = dict(ident)
+    for k, (w, lev) in PORTFOLIO_WL.items():
+        st = _window_stats(lev * strat + w * spy, spy)
+        st.update(n_events=None, n_trades=wu["n_trades"])
+        for c in TABLE_COLS:
+            row[f"{k}.{c}"] = st.get(c)
+    row["n_trades_floor"] = wu["n_trades_floor"]
+    row["util_avg_pct"], row["util_days_pct"] = wu["util_avg_pct"], wu["util_days_pct"]
+    return row
+
+
+def _data_window(scope, construction, universe, exit_code, cap, fee, start, end):
+    """data() over [start, end]: every statistic recomputed from the daily files."""
+    _prefetch([_daily_key(exit_code, cap, fee), _daily_key(exit_code, DEFAULT_CAP, fee)]
+              + [_daily_key(e, cap, fee) for e, _ in EXITS]
+              + [_daily_key(exit_code, c, fee) for c in CAPS]
+              + [_daily_key(exit_code, cap, f) for f in FEES]
+              + [_util_key(c) for c in CAPS]
+              + [_stop_key(exit_code, lvl, fee) for lvl in STOP_LEVELS])
+    daily = _daily(exit_code, cap, fee)
+    strat = _window(_daily_panel(exit_code, scope, construction, universe, cap, fee), start, end)
+    spy = _window(daily["spy_buy_hold"], start, end)
+
+    series, stats = [], {}
+    wu = _window_util(scope, construction, universe, cap, start, end)
+    for pkey, (w, lev) in PORTFOLIO_WL.items():
+        port = lev * strat + w * spy
+        series.append(_series(pkey, port))
+        st = _window_stats(port, spy)
+        st.update(n_events=None, n_trades=wu["n_trades"], n_trades_floor=wu["n_trades_floor"])
+        stats[pkey] = st
+    series.append(_series("spy", spy))
+    stats["spy"] = _window_stats(spy, spy)
+    stats["spy"]["beat_spy_pct"] = None          # SPY vs itself is meaningless (full-history tile omits it too)
+
+    util = None
+    u = _util_panel(scope, construction, universe, cap)
+    if u is not None:
+        u = _window(u, start, end, strict=False)
+        if len(u):
+            util = {"dates": [d.strftime("%Y-%m-%d") for d in u.index],
+                    "pct": [round(x * 100, 2) for x in u],
+                    "roll63": [None if pd.isna(x) else round(x * 100, 2) for x in u.rolling(63).mean()],
+                    "avg_pct": float(u.mean()) * 100, "days_traded_pct": float((u > 0).mean()) * 100,
+                    "max_basket_weight_pct": cap}
+
+    cells, seen = [], set()
+    for c in CONSTRUCTIONS:
+        for un in UNIVERSES:
+            cc, uu = coerce_cell(c, un)
+            if (cc, uu) in seen:
+                continue
+            seen.add((cc, uu))
+            r = _window_row(daily, {"construction": cc, "universe": uu}, scope, cc, uu, cap, start, end)
+            if r:
+                cells.append(r)
+    scopes = [r for r in (_window_row(daily, {"scope": key}, key, construction, universe, cap, start, end)
+                          for key, _, _ in SCOPES) if r]
+    exits = []
+    for code, lab in EXITS:
+        d = _cache.get(_daily_key(code, cap, fee))
+        r = _window_row(d, {"exit": code, "exit_label": lab}, scope, construction, universe, cap, start, end) \
+            if d is not None else None
+        if r:
+            exits.append(r)
+    caps = []
+    for c in CAPS:
+        d = _cache.get(_daily_key(exit_code, c, fee))
+        r = _window_row(d, {"scope": scope}, scope, construction, universe, c, start, end) if d is not None else None
+        if r:
+            r["cap"] = c; r["cap_label"] = f"{c}% per basket"
+            caps.append(r)
+    fees_rows = []
+    for f in FEES:
+        d = _cache.get(_daily_key(exit_code, cap, f))
+        r = _window_row(d, {"scope": scope}, scope, construction, universe, cap, start, end) if d is not None else None
+        if r:
+            r["fee"] = f; r["fee_label"] = FEE_LABEL[f]
+            fees_rows.append(r)
+
+    # stop-loss: strategy-only window stats per level (0 = baseline), at the 2% cap like the simulation
+    stop_rows, stop_series, any_stop, rows = None, [], False, []
+    for lvl in [0] + STOP_LEVELS:
+        r = None
+        try:
+            if lvl == 0:
+                if _daily_key(exit_code, DEFAULT_CAP, fee) in _cache:
+                    r = _daily_panel(exit_code, scope, construction, universe, DEFAULT_CAP, fee)
+            elif _stop_key(exit_code, lvl, fee) in _cache:
+                r = _stop_panel(exit_code, lvl, scope, construction, universe, fee)
+        except Exception:
+            r = None
+        if r is not None:
+            r = _window(r, start, end, strict=False)
+            if not len(r):
+                r = None
+        if r is not None and lvl:
+            any_stop = True
+            stop_series.append(_series(f"stop{lvl}", r))
+        st = _window_stats(r, spy) if r is not None else {k: None for k in WSTAT_KEYS}
+        rows.append({"stop_bps": lvl, **st})
+    if any_stop:
+        stop_rows = rows
+
+    return {
+        "scope": scope, "construction": construction, "universe": universe,
+        "exit": exit_code, "exit_label": EXIT_LABEL[exit_code], "cap": cap,
+        "fee": fee, "fee_label": FEE_LABEL[fee], "fee_drag_bps": None,
+        "granularity": "daily", "series": series, "stats": stats,
+        "cells": cells, "scopes": scopes, "exits": exits, "caps": caps, "fees": fees_rows,
+        "hist": None, "hist_grid": None,
+        "exc_groups": None, "exc_touch": None,
+        "stop_rows": stop_rows, "stop_series": stop_series, "util": util,
+        "util_buckets": None, "adv_cap": None,
+        "window": _window_label(strat.index), "windowed": True, "start": start, "end": end,
+    }
+
+
 # --------------------------------------------------------------------- data
-def data(scope, construction, universe, exit_code=DEFAULT_EXIT, cap=DEFAULT_CAP, fee=DEFAULT_FEE):
+def data(scope, construction, universe, exit_code=DEFAULT_EXIT, cap=DEFAULT_CAP, fee=DEFAULT_FEE,
+         start=None, end=None):
     if scope not in {s[0] for s in SCOPES}:
         raise ValueError(f"unknown scope {scope!r}")
     if construction not in CONSTRUCTIONS or universe not in UNIVERSES:
@@ -323,6 +640,11 @@ def data(scope, construction, universe, exit_code=DEFAULT_EXIT, cap=DEFAULT_CAP,
         raise ValueError(f"unknown per-basket cap {cap!r}")
     if fee not in FEES:
         raise ValueError(f"unknown per-share fee {fee!r} (mills)")
+    start, end = _iso(start), _iso(end)
+    if start and end and start > end:
+        raise ValueError(f"start {start} is after end {end}")
+    if start or end:
+        return _data_window(scope, construction, universe, exit_code, cap, fee, start, end)
 
     st_all = _stats(cap, fee)
     st = st_all[st_all.exit == exit_code]
@@ -334,7 +656,7 @@ def data(scope, construction, universe, exit_code=DEFAULT_EXIT, cap=DEFAULT_CAP,
         if k:
             stats[k] = {c: _clean(row[c]) for c in
                         ["sharpe", "ann_ret_pct", "total_pct", "max_dd_pct", "p2t_days",
-                         "p2r_days", "recovered", "n_events", "beat_spy_pct", "wiped_out"] if c in row}
+                         "p2r_days", "recovered", "n_events", "n_trades", "beat_spy_pct", "wiped_out"] if c in row}
     spy_row = st[st.scope == "SPY"].iloc[0]
     stats["spy"] = {c: _clean(spy_row[c]) for c in
                     ["sharpe", "ann_ret_pct", "total_pct", "max_dd_pct", "p2t_days", "p2r_days", "recovered"]}
@@ -360,7 +682,7 @@ def data(scope, construction, universe, exit_code=DEFAULT_EXIT, cap=DEFAULT_CAP,
     # comparison tables: (a) every construction x universe within this scope,
     # (b) every scope for this construction x universe, (c) every exit for this
     # scope x construction x universe — all three portfolios side by side
-    cols = ["sharpe", "ann_ret_pct", "total_pct", "max_dd_pct", "beat_spy_pct", "n_events", "wiped_out"]
+    cols = ["sharpe", "ann_ret_pct", "total_pct", "max_dd_pct", "beat_spy_pct", "n_events", "n_trades", "wiped_out"]
 
     def wide(df, keycols):
         out = {}
@@ -470,7 +792,9 @@ def data(scope, construction, universe, exit_code=DEFAULT_EXIT, cap=DEFAULT_CAP,
         "hist": hist, "hist_grid": hist_grid,
         "exc_groups": exc_groups, "exc_touch": exc_touch,
         "stop_rows": stop_rows, "stop_series": stop_series, "util": util,
-        "window": "2016-01-05 -> 2026-08-06 (2,571 trade days)",
+        "util_buckets": _util_buckets(), "adv_cap": _adv_cap(),
+        "window": _window_label(_daily(exit_code, cap, fee).index),
+        "windowed": False, "start": None, "end": None,
     }
 
 
@@ -481,7 +805,11 @@ def data_json(qs):
     exit_code = qs.get("exit", [DEFAULT_EXIT])[0]
     cap = int(qs.get("cap", [DEFAULT_CAP])[0])
     fee = int(qs.get("fee", [DEFAULT_FEE])[0])
-    return json.dumps(data(scope, construction, universe, exit_code, cap, fee), allow_nan=False).encode()
+    start = _iso(qs.get("start", [None])[0])
+    end = _iso(qs.get("end", [None])[0])
+    if start and end and start > end:
+        raise ValueError(f"start {start} is after end {end}")
+    return json.dumps(data(scope, construction, universe, exit_code, cap, fee, start, end), allow_nan=False).encode()
 
 
 # --------------------------------------------------------------------- page
@@ -533,7 +861,7 @@ a{color:var(--link);text-decoration:none} a:hover{text-decoration:underline}
 h1{font-size:1.25rem;margin:0 0 .2rem} .sub{color:var(--ink2);margin:0 0 1rem}
 .filters{display:flex;flex-wrap:wrap;gap:1rem 1.4rem;align-items:flex-end;margin-bottom:1rem}
 .filters label{display:flex;flex-direction:column;gap:.25rem;color:var(--ink2);font-size:.8rem}
-select,button{font:inherit;padding:.3rem .5rem;border:1px solid var(--axis);border-radius:6px;
+select,button,input{font:inherit;padding:.3rem .5rem;border:1px solid var(--axis);border-radius:6px;
   background:var(--surface);color:var(--ink)}
 .toggles{display:flex;gap:.9rem;flex-wrap:wrap}
 .toggles label{flex-direction:row;align-items:center;gap:.35rem;color:var(--ink);font-size:.85rem}
@@ -577,7 +905,7 @@ tr.sel td{background:rgba(42,120,214,.10)} tbody tr{cursor:pointer} tbody tr:hov
 details summary{cursor:pointer;color:var(--link)}
 </style></head><body>
 <h1>10-year basket study — sentiment/fade strategy with vs. without an S&amp;P 500 leg</h1>
-<p class="sub">Window 2016-01-05 → 2026-08-06, 2,571 trade days, 167,644 earnings events (fade-the-gap, 9:30 open → RTH close).
+<p class="sub">Window <span id="winline">2016-01-05 → 2026-08-06, 2,571 trade days</span><span id="nevents">, 167,644 earnings events</span> (fade-the-gap, 9:30 open → RTH close).
 Portfolio = w × SPY buy&amp;hold + L × strategy, rebalanced daily; exit = when the baskets are unwound on the trade day. Source: <a href="/browse?prefix=__BASE__">s3 …/__BASE__</a>
 · <a href="/">results browser</a></p>
 
@@ -588,12 +916,16 @@ Portfolio = w × SPY buy&amp;hold + L × strategy, rebalanced daily; exit = when
   <label>Exit (unwind time)<select id="exit">__EXITS__</select></label>
   <label>Per-basket limit<select id="cap">__CAPS__</select></label>
   <label>Commission<select id="fee">__FEES__</select></label>
+  <label>From<input type="date" id="start"></label>
+  <label>To<input type="date" id="end"></label>
+  <button id="fullhist" title="clear the date window">Full history</button>
   <label>Y axis<select id="yscale"><option value="linear">linear</option><option value="log">log (growth of $1)</option></select></label>
   <label>Theme<select id="theme"><option value="auto">auto</option><option value="light">light</option><option value="dark">dark</option></select></label>
   <div class="toggles" id="toggles"></div>
 </div>
 
 <div class="tiles" id="tiles"></div>
+<p class="note" id="winnote" hidden style="margin:-.4rem 0 1rem"></p>
 
 <div class="card"><h2>Cumulative return<span id="eqnote"></span></h2><div id="eq"></div></div>
 <div class="card"><h2>Drawdown from peak</h2><div id="dd"></div></div>
@@ -603,7 +935,7 @@ Portfolio = w × SPY buy&amp;hold + L × strategy, rebalanced daily; exit = when
   <div id="util" style="height:260px"></div>
 </div>
 
-<div class="card"><h2>Per-trade P&amp;L distribution<span id="histnote"></span></h2>
+<div class="card" id="histcard"><h2>Per-trade P&amp;L distribution<span id="histnote"></span></h2>
   <div class="filters" style="margin-bottom:.5rem">
     <label>Bin width<select id="binw"><option value="25">25 bps</option><option value="50" selected>50 bps</option><option value="100">100 bps</option><option value="200">200 bps</option></select></label>
     <label>Y axis<select id="histy"><option value="pct">% of trades</option><option value="count">trades</option><option value="log">trades (log)</option></select></label>
@@ -639,7 +971,7 @@ Portfolio = w × SPY buy&amp;hold + L × strategy, rebalanced daily; exit = when
 
 <div class="card"><details><summary>Table view — calendar-year returns of the plotted series</summary><div class="scroll" id="yearly"></div></details></div>
 
-<div class="card"><h2>Excursion statistics — the path to the selected exit<span id="excnote"></span></h2>
+<div class="card" id="exccard"><h2>Excursion statistics — the path to the selected exit<span id="excnote"></span></h2>
   <p class="note">For each trade the path is its P&amp;L at the marks up to the exit: 9:31–9:35 by the minute, then every 30 min to 15:30, then close. MAE = worst mark on the path, MFE = best mark, final = P&amp;L at the exit; all in bps of basket notional (100 bps = 1%). Moves between marks are not observed. Left: trades grouped by their final P&amp;L. Right: how often a threshold was touched on the way, and how those trades ended.</p>
   <h3>By final P&amp;L bucket (bps)</h3><div class="scroll" id="excg"></div>
   <div class="two" id="exct"></div>
@@ -652,11 +984,24 @@ Portfolio = w × SPY buy&amp;hold + L × strategy, rebalanced daily; exit = when
   <div class="two" style="margin-top:.6rem"><div id="stopeq" style="height:320px"></div><div id="stopdd" style="height:320px"></div></div>
 </div>
 
+<div class="card" id="ubcard"><h2>Returns by capital utilization — quartiles and fixed bands<span id="ubnote"></span></h2>
+  <p class="note">Fixed settings, not driven by the selectors: ALL scope, close exit, 2% per-basket cap, 2016-01-05 → 2026-08-06. Utilization = min(1, trades that day × 2%); day return = mean trade P&amp;L × utilization. Quartiles rank each cell's own trade days by utilization (Q1 = lowest); bands are fixed 0–25 / 25–50 / 50–75 / 75–100%. Each metric shows gross / net, where net = IBKR Pro Fixed per order min(max($1, $0.005 × shares), 1% × order value) on entry and exit of every leg at the chosen starting capital. Annual return compounds the bucket's days as if every day were in that bucket; max drawdown is over the bucket's days only; trade hit = share of trades with P&amp;L &gt; 0. Peers cells are pure play; SPY cells trade fewer events (thin reporters fail the beta fit). Standing benchmarks per bucket: <b>L/S</b> = long reporter / short the same hedge (the fade decision deleted, same fees); <b>null p95</b> = 95th percentile Sharpe of 64 frozen random-sign portfolios; <b>p</b> = (1 + #null Sharpe ≥ strategy) / 65.</p>
+  <p class="note">Starting capital <select id="ubcap"></select></p>
+  <div class="scroll" id="utilbk"></div>
+</div>
+
+<div class="card" id="accard"><h2>Scalability — every basket capped at a % of ADV<span id="acnote"></span></h2>
+  <p class="note">Fixed settings, not driven by the selectors: close exit, 2016-01-05 → 2026-08-06 (2,571 trade days). ADV = mean daily dollar volume (Alpaca SIP daily bars, VWAP × volume) over the 20 sessions <i>before</i> the trade day. Target basket = capital × min(1/N, basket cap); if any leg's order exceeds the ADV % limit the <b>whole basket</b> is scaled down so hedge ratios hold (a leg with no ADV history is not traded — about 2% of legs, mostly tickers Alpaca has no bars for on that date; compare the caps against <b>no cap, ADV-known trades</b>, the same trade set uncapped; <b>no cap, all trades</b> is the study). Capital a capped basket cannot use stays in cash — it is not given to other baskets. No market-impact cost; net = IBKR Pro Fixed commissions on the scaled orders. <b>deployed</b> = mean daily notional / capital; <b>scaled</b> = share of trades cut below target; <b>zero</b> = share not traded. Benchmarks on net: L/S = long reporter / short hedge at the same sizes; null p95 and p over 64 random-sign portfolios, p = (1 + #null ≥ strategy) / 65.</p>
+  <p class="note"><b>Out-of-sample:</b> IS = 2016-01-05 → 2021-12-31 (1,440 trade days), OOS = 2022-01-03 → 2026-08-06 (1,131). Sizing uses only prior ADV and same-day trade counts, so the split is clean. <b>Only the ALL scope is look-ahead free:</b> the tier scopes (MICRO/SMALL/MID/LARGE/EX-MICRO) are cut on the reporter's <i>trade-day</i> dollar volume, and inside a tier a thin prior ADV means that day's volume spiked — the tier × ADV-cap results use information known only after the close.</p>
+  <p class="note">Period <select id="acper"></select> Scope <select id="acscope"></select> Capital <select id="accap"></select> Basket cap <select id="acbcap"></select></p>
+  <div class="scroll" id="advcap"></div>
+</div>
+
 
 <script>
 const SERIES = __SERIES__;
 const $ = id => document.getElementById(id);
-const state = {scope:"ALL", construction:"ridge_levels_beta_neutral", universe:"pure play", exit:"close", cap:"2", fee:"0",
+const state = {scope:"ALL", construction:"ridge_levels_beta_neutral", universe:"pure play", exit:"close", cap:"2", fee:"0", start:"", end:"",
                show:{strat:true, spy1_strat1:true, spy1_strat2:true, spy:true}};
 let last = null;
 
@@ -669,10 +1014,13 @@ function css(v){ return getComputedStyle(document.documentElement).getPropertyVa
 const fmt = (v,d=2,suf="") => (v==null||isNaN(v)) ? "—" : (v>0&&suf==="%"?"+":"") + v.toFixed(d) + suf;
 
 function readURL(){ const p=new URLSearchParams(location.search);
-  for(const k of ["scope","construction","universe","exit","cap","fee"]) if(p.get(k)) state[k]=p.get(k);
+  for(const k of ["scope","construction","universe","exit","cap","fee","start","end"]) if(p.get(k)) state[k]=p.get(k);
   if(p.get("grid")==="1") $("hgdet").open=true;
-  $("scope").value=state.scope; $("construction").value=state.construction; $("universe").value=state.universe; $("exit").value=state.exit; $("cap").value=state.cap; $("fee").value=state.fee; }
-function writeURL(){ const p=new URLSearchParams({scope:state.scope,construction:state.construction,universe:state.universe,exit:state.exit,cap:state.cap,fee:state.fee});
+  $("scope").value=state.scope; $("construction").value=state.construction; $("universe").value=state.universe; $("exit").value=state.exit; $("cap").value=state.cap; $("fee").value=state.fee;
+  $("start").value=state.start; $("end").value=state.end; }
+function params(){ const p=new URLSearchParams({scope:state.scope,construction:state.construction,universe:state.universe,exit:state.exit,cap:state.cap,fee:state.fee});
+  if(state.start) p.set("start",state.start); if(state.end) p.set("end",state.end); return p; }
+function writeURL(){ const p=params();
   history.replaceState(null,"","?"+p); }
 
 function buildToggles(){
@@ -688,8 +1036,8 @@ function buildToggles(){
 
 async function load(){
   document.querySelectorAll(".card,.tiles").forEach(e=>e.classList.add("fade"));
-  const p=new URLSearchParams({scope:state.scope,construction:state.construction,universe:state.universe,exit:state.exit,cap:state.cap,fee:state.fee});
-  const r=await fetch("/study10y/data?"+p); if(!r.ok){alert(await r.text()); return;}
+  const p=params();
+  const r=await fetch("/study10y/data?"+p); if(!r.ok){alert(await r.text()); document.querySelectorAll(".card,.tiles").forEach(e=>e.classList.remove("fade")); return;}
   last=await r.json();
   state.construction=last.construction; state.universe=last.universe;   // server coerces reporter_only <-> none
   $("construction").value=state.construction; $("universe").value=state.universe;
@@ -723,10 +1071,19 @@ function draw(){
   const L2=layoutBase(); L2.showlegend=false; L2.margin.t=4;
   L2.yaxis={title:"drawdown, %", ticksuffix:"%", gridcolor:css("--grid"), zeroline:false, rangemode:"tozero"};
   Plotly.react("dd", dd, L2, {displaylogo:false, responsive:true});
-  $("eqnote").textContent = `${last.scope} · ${last.construction} · ${last.universe} · exit ${last.exit_label} · cap ${last.cap}%/basket · commission ${last.fee_label} · ${last.granularity} series, 2,571 trade days`;
-  tiles(); utilChart(); cellsTable(); scopesTable(); exitsTable(); capsTable(); feesTable(); yearly(shown); drawHist(); drawHistGrid(); excGroups(); excTouch(); stopTable(); stopCharts();
+  $("eqnote").textContent = `${last.scope} · ${last.construction} · ${last.universe} · exit ${last.exit_label} · cap ${last.cap}%/basket · commission ${last.fee_label} · ${last.granularity} series, ${last.window.replace("->","→")}`;
+  windowView();
+  tiles(); utilChart(); cellsTable(); scopesTable(); exitsTable(); capsTable(); feesTable(); yearly(shown); drawHist(); drawHistGrid(); excGroups(); excTouch(); stopTable(); stopCharts(); utilBuckets(); advCap();
 }
 
+function windowView(){
+  const w=last.windowed===true, n=last.series.length ? last.series[0].dates.length : 0;
+  $("winline").textContent=last.window.replace("->","→").replace(" (",", ").replace(")","");
+  $("nevents").hidden=w;
+  for(const id of ["histcard","exccard","ubcard","accard"]) $(id).hidden=w;
+  const wn=$("winnote"); wn.hidden=!w;
+  wn.textContent = w ? `Window statistics are recomputed from daily returns over ${n.toLocaleString()} trade days (Sharpe annualised by sqrt(252)); trade counts come from daily utilization and are a lower bound on days that hit the per-basket cap; multi-day exits (day 2..5 close) are booked on the entry day, so the last entries unwind after the end date. Per-trade histogram, excursion, utilization-bucket and ADV-cap cards need the full history and are hidden.` : "";
+}
 function utilChart(){
   const u=last.util; const box=$("util");
   if(!u){ box.innerHTML="<p class='note'>utilization file not available</p>"; $("utilnote").textContent=""; return; }
@@ -757,7 +1114,8 @@ function tiles(){
         ...(st.beat_spy_pct==null ? [] : [["days beating SPY", pct(st.beat_spy_pct)]]),
         ...(s.key==="strat" && last.util ? [["capital used (avg)", pct(last.util.avg_pct)]] : []),
         ...(s.key==="strat" && last.fee_drag_bps!=null ? [["commission (avg/trade)", last.fee_drag_bps.toFixed(1)+" bps"]] : []),
-        ["events", st.n_events==null?"—":Math.round(st.n_events).toLocaleString()]]){
+        ["events in scope", st.n_events==null?"—":Math.round(st.n_events).toLocaleString()],
+        ...(st.n_trades==null ? [] : [["trades", Math.round(st.n_trades).toLocaleString()+(st.n_trades_floor?"+":"")]])]){
       const r=document.createElement("div"); r.className="row"; const a=document.createElement("span"); a.textContent=k;
       const b=document.createElement("b"); b.textContent=v; r.append(a,b); d.append(r); }
     t.append(d);
@@ -769,7 +1127,8 @@ const pct = v => (v==null||isNaN(v)) ? "—" : v.toFixed(1)+"%";
 function statTable(rows, keyCols, onPick, selFn){
   const tbl=document.createElement("table"); const th=document.createElement("thead"); const tr=document.createElement("tr");
   for(const k of keyCols){ const h=document.createElement("th"); h.className="l"; h.textContent=(k==="exit_label"?"exit":k==="cap_label"?"per-basket limit":k==="fee_label"?"commission":k); tr.append(h); }
-  const h0=document.createElement("th"); h0.textContent="events"; tr.append(h0);
+  const h0=document.createElement("th"); h0.textContent="events in scope"; tr.append(h0);
+  const h1=document.createElement("th"); h1.textContent="trades"; h1.title="ok trade rows in the cell (POOLED = sum of member cells); events in scope counts the scope's event grid"; tr.append(h1);
   for(const t of [`capital used (${last.cap}%/basket)`,"days with baskets"]){ const h=document.createElement("th"); h.textContent=t; h.title="strategy capital utilization: avg % of capital deployed / % of trade days with at least one basket"; tr.append(h); }
   for(const [pk,pl] of [["strat","strategy only"],["spy1_strat1","1× strat + 1× SPY"],["spy1_strat2","2× strat + 1× SPY"]]){
     M.forEach(([m,ml],i)=>{ const h=document.createElement("th"); if(i===0) h.className="grp";
@@ -780,6 +1139,7 @@ function statTable(rows, keyCols, onPick, selFn){
     const row=document.createElement("tr"); if(selFn(r)) row.className="sel";
     for(const k of keyCols){ const c=document.createElement("td"); c.className="l"; c.textContent=r[k]; row.append(c); }
     const ne=document.createElement("td"); ne.textContent=r["strat.n_events"]==null?"—":Math.round(r["strat.n_events"]).toLocaleString(); row.append(ne);
+    row.append(cellTd(r["strat.n_trades"]==null?"—":Math.round(r["strat.n_trades"]).toLocaleString()+(r.n_trades_floor?"+":"")));
     row.append(cellTd(pct(r.util_avg_pct)), cellTd(pct(r.util_days_pct)));
     for(const pk of ["strat","spy1_strat1","spy1_strat2"]) M.forEach(([m,,d,suf],i)=>{ const c=document.createElement("td");
       const v=r[pk+"."+m]; if(i===0) c.className="grp";
@@ -851,7 +1211,7 @@ function drawHistGrid(){
   const rows=["POOLED","equal_weight_dollar_neutral","ridge_returns_beta_neutral","ridge_returns_dollar_neutral","ridge_levels_beta_neutral","reporter_only","spy_beta_levels_neutral","spy_beta_returns_neutral","spy_dollar_neutral"];
   const hedgedCols=["POOLED","all","correlated","functional","pure play"];
   const SINGLE={reporter_only:"none",spy_beta_levels_neutral:"SPY",spy_beta_returns_neutral:"SPY",spy_dollar_neutral:"SPY"};
-  const colsFor=c=>SINGLE[c]?[SINGLE[c]]:hedgedCols;   // single-cell constructions: one pseudo-universe
+  const colsFor=c=>SINGLE[c]?[SINGLE[c]]:(c==="POOLED"?hedgedCols:[...hedgedCols,"corr"]);   // single-cell constructions: one pseudo-universe; corr = extra column of the hedged rows
   const byKey={}; for(const h of last.hist_grid) byKey[h.construction+"|"+h.universe]=h;
   const xr = $("histx").value==="auto" ? null : [-(+$("histx").value), +$("histx").value];
   let i=0;
@@ -933,11 +1293,74 @@ function stopTable(){
   for(const r of rows){
     const row=document.createElement("tr"); const sw=document.createElement("span"); sw.className="swatch"; sw.style.background=stopColor(r.stop_bps);
     const c0=document.createElement("td"); c0.className="l"; c0.append(sw, document.createTextNode(" "+stopLabel(r.stop_bps))); row.append(c0);
-    row.append(cellTd(r.n_trades.toLocaleString()));
+    row.append(cellTd(r.n_trades==null?"—":r.n_trades.toLocaleString()));
     row.append(cellTd(r.stop_bps?pct(r.stopped_pct):"—","grp"), cellTd(r.stop_bps?pct(r.stopped_ended_pos_pct):"—"), cellTd(r.stop_bps?bps(r.stopped_unstopped_mean_bps):"—", r.stopped_unstopped_mean_bps<0?"neg":""), cellTd(r.stop_bps?bps(r.stopped_fill_mean_bps):"—","neg"));
     row.append(cellTd(bps(r.mean_bps),"grp"+(r.mean_bps<0?" neg":"")), cellTd(r.stop_bps?(r.delta_mean_bps>=0?"+":"")+bps(r.delta_mean_bps):"—", r.delta_mean_bps<0?"neg":""), cellTd(bps(r.median_bps), r.median_bps<0?"neg":""), cellTd(bps(r.std_bps)), cellTd(pct(r.hit_rate)), cellTd(bps(r.p05_bps),"neg"), cellTd(bps(r.p95_bps)));
     row.append(cellTd(fmt(r.sharpe,2),"grp"+(r.sharpe<0?" neg":"")), cellTd(fmt(r.ann_ret_pct,1,"%"), r.ann_ret_pct<0?"neg":""), cellTd(fmt(r.total_pct,0,"%"), r.total_pct<0?"neg":""), cellTd(fmt(r.max_dd_pct,1,"%"),"neg"), cellTd(r.p2r_days==null?"—":Math.round(r.p2r_days).toLocaleString()), cellTd(pct(r.beat_spy_pct), r.beat_spy_pct<50?"neg":""));
     if(base && r.stop_bps && r.sharpe>base.sharpe) row.cells[13].style.fontWeight="600";
+    tb.append(row);
+  }
+  tbl.append(tb); box.append(tbl);
+}
+function utilBuckets(){
+  const box=$("utilbk"); box.innerHTML=""; const ub=last.util_buckets; const sel=$("ubcap");
+  if(!ub||!ub.rows.length){ box.innerHTML="<p class='note'>utilization buckets not produced yet (run earnings_basket_study/utilization_buckets.py --write)</p>"; $("ubnote").textContent=""; return; }
+  const money=c=>c>=1e6?`$${c/1e6}M`:`$${c/1e3}k`;
+  if(!sel.options.length){ for(const c of ub.capitals){ const o=document.createElement("option"); o.value=c; o.textContent=money(c); sel.append(o); }
+    sel.value=ub.capitals[ub.capitals.length-1]; sel.onchange=utilBuckets; }
+  const cap=+sel.value; $("ubnote").textContent=` · net at ${money(cap)} capital`;
+  const M=[["Sharpe","sharpe",2,""],["ann return","ann_ret_pct",1,"%"],["max DD","max_dd_pct",1,"%"],["day hit","day_hit_pct",1,"%"],["trade hit","trade_hit_pct",1,"%"]];
+  const B=[["L/S Sharpe","bench_%_sharpe",2],["null p95","null_%_p95_sharpe",2],["p","p_%",2]];
+  const tbl=document.createElement("table"); tbl.className="static"; const th=document.createElement("thead");
+  const g=document.createElement("tr"); for(const [t,span,cls] of [["",5],...M.map(m=>[m[0]+" (gross / net)",2,"grp"]),["benchmarks, gross",3,"grp"],["benchmarks, net",3,"grp"]]){ const h=document.createElement("th"); h.colSpan=span; h.textContent=t; h.className=(cls||"")+" sub"; g.append(h);} th.append(g);
+  const tr=document.createElement("tr"); for(const [t,cls] of [["cell","l"],["bucket","l"],["days",""],["utilization",""],["trades",""],...M.flatMap(()=>[["gross","grp"],["net",""]]),...[0,1].flatMap(()=>B.map((b,i)=>[b[0],i?"":"grp"]))]){ const h=document.createElement("th"); h.textContent=t; h.className=cls; tr.append(h);} th.append(tr); tbl.append(th);
+  const tb=document.createElement("tbody");
+  const cls=(v,m)=>m[1].endsWith("hit_pct")?(v<50?"neg":""):(v<0?"neg":"");
+  for(const kind of ["quartile","band"]){
+    const sep=document.createElement("tr"); const sc=cellTd(kind==="quartile"?"Quartiles of each cell's utilization days":"Fixed utilization bands","l grp"); sc.colSpan=21; sc.style.fontWeight="600"; sep.append(sc); tb.append(sep);
+    let prev=null;
+    for(const r of ub.rows.filter(r=>r.kind===kind && r.capital===cap)){
+      const row=document.createElement("tr"); const first=r.cell!==prev;
+      if(first && prev!==null) row.style.borderTop="1px solid var(--grid)"; prev=r.cell;
+      const c0=cellTd(first?r.cell:"","l"); if(r.construction===last.construction) c0.style.fontWeight="600"; row.append(c0);
+      row.append(cellTd(r.bucket,"l"), cellTd(r.days.toLocaleString()), cellTd(`${Math.round(r.util_min_pct)}–${Math.round(r.util_max_pct)}%`), cellTd(r.trades.toLocaleString()));
+      for(const m of M) for(const k of ["gross","net"]){ const v=r[`${k}_${m[1]}`]; row.append(cellTd(m[3]==="%"?(v==null||isNaN(v)?"—":v.toFixed(m[2])+"%"):fmt(v,m[2]), (k==="gross"?"grp ":"")+cls(v,m))); }
+      for(const k of ["gross","net"]) B.forEach((b,i)=>{ const v=r[b[1].replace("%",k)];
+        const c=cellTd(fmt(v,b[2]), (i?"":"grp ")+(b[0]==="p"?"":(v<0?"neg":"")));
+        if(b[0]==="p" && v<=0.05) c.style.fontWeight="600";
+        if(b[0]==="L/S Sharpe" && v>r[`${k}_sharpe`]) c.style.fontWeight="600";
+        row.append(c); });
+      tb.append(row);
+    }
+  }
+  tbl.append(tb); box.append(tbl);
+}
+function advCap(){
+  const box=$("advcap"); box.innerHTML=""; const ac=last.adv_cap;
+  if(!ac||!ac.rows.length){ box.innerHTML="<p class='note'>ADV-cap simulation not produced yet (run earnings_basket_study/adv_cap.py --write)</p>"; $("acnote").textContent=""; return; }
+  const money=c=>c>=1e6?`$${c/1e6}M`:`$${c/1e3}k`;
+  const fill=(id,vals,lab,def)=>{ const sel=$(id); if(sel.options.length) return;
+    for(const v of vals){ const o=document.createElement("option"); o.value=v; o.textContent=lab(v); sel.append(o); } sel.value=def; sel.onchange=advCap; };
+  fill("acper",ac.periods,v=>v,"full"); fill("acscope",ac.scopes,v=>v,"ALL"); fill("accap",ac.capitals,money,ac.capitals[1]??ac.capitals[0]); fill("acbcap",ac.caps,v=>`${v*100}%`,ac.caps[0]);
+  const per=$("acper").value, sc=$("acscope").value, cap=+$("accap").value, bc=+$("acbcap").value;
+  $("acnote").textContent=` · ${per} · ${sc}${sc==="ALL"?"":" (tier = trade-day volume, look-ahead)"} · ${money(cap)} · ${bc*100}% per basket`;
+  const C=[["trades","trades",0,""],["deployed","deployed_pct",1,"%"],["scaled","scaled_pct",1,"%"],["zero","zero_pct",1,"%"],["median scale","median_scale",2,""],
+           ["Sharpe gross","gross_sharpe",2,""],["Sharpe net","net_sharpe",2,""],["ann ret gross","gross_ann_ret_pct",1,"%"],["ann ret net","net_ann_ret_pct",1,"%"],
+           ["max DD net","net_max_dd_pct",1,"%"],["net $/yr","net_ann_pnl_usd",0,"$"],["L/S Sharpe net","bench_net_sharpe",2,""],["null p95 net","null_net_p95_sharpe",2,""],["p net","p_net",2,""]];
+  const tbl=document.createElement("table"); tbl.className="static"; const th=document.createElement("thead"); const tr=document.createElement("tr");
+  for(const [t,cls] of [["cell","l"],["ADV cap","l"],...C.map(c=>[c[0],""])]){ const h=document.createElement("th"); h.textContent=t; h.className=cls; tr.append(h);} th.append(tr); tbl.append(th);
+  const tb=document.createElement("tbody"); let prev=null;
+  for(const r of ac.rows.filter(r=>r.period===per && r.scope===sc && r.capital===cap && r.basket_cap===bc)){
+    const row=document.createElement("tr"); const first=r.cell!==prev;
+    if(first && prev!==null) row.style.borderTop="1px solid var(--grid)"; prev=r.cell;
+    const c0=cellTd(first?r.cell:"","l"); if(r.construction===last.construction) c0.style.fontWeight="600"; row.append(c0);
+    row.append(cellTd(r.adv_label,"l"));
+    for(const c of C){ const v=r[c[1]];
+      const t=v==null||isNaN(v)?"—":c[3]==="%"?v.toFixed(c[2])+"%":c[3]==="$"?"$"+Math.round(v).toLocaleString():c[1]==="trades"?v.toLocaleString():fmt(v,c[2]);
+      const td=cellTd(t,(["gross_sharpe","bench_net_sharpe"].includes(c[1])?"grp ":"")+(v<0&&c[1]!=="net_max_dd_pct"?"neg":""));
+      if(c[1]==="p_net" && v<=0.05) td.style.fontWeight="600";
+      if(c[1]==="bench_net_sharpe" && v>r.net_sharpe) td.style.fontWeight="600";
+      row.append(td); }
     tb.append(row);
   }
   tbl.append(tb); box.append(tbl);
@@ -988,6 +1411,8 @@ function yearly(shown){
 }
 
 for(const id of ["scope","construction","universe","exit","cap","fee"]) $(id).onchange=e=>{state[id]=e.target.value; load();};
+for(const id of ["start","end"]) $(id).onchange=e=>{state[id]=e.target.value; load();};
+$("fullhist").onclick=()=>{state.start=""; state.end=""; $("start").value=""; $("end").value=""; load();};
 $("yscale").onchange=draw;
 for(const id of ["binw","histy","histx"]) $(id).onchange=()=>{drawHist(); drawHistGrid();};
 $("hgdet").ontoggle=drawHistGrid;

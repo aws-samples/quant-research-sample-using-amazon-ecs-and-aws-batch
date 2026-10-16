@@ -17,6 +17,7 @@ Writes the same artifacts to the same places as `aggregate.py --finalize
 """
 import argparse
 import sys
+import os
 import time
 from pathlib import Path
 
@@ -84,9 +85,11 @@ def load_ok(s3io, s3_prefix: str, cache: str | None = None, fee_per_share: float
             shards = pl.read_parquet(src, storage_options=s3io.pl_opts).to_pandas()
             print(f"shards from {src}: {shards.shape} in {time.time() - t:.0f}s", flush=True)
         except Exception as e:  # consolidated object missing -> slow glob scan
+            if os.environ.get("LOAD_OK_STRICT"):   # Batch children (evaluate.py produce): fail fast
+                raise
             print(f"{src} unavailable ({e.__class__.__name__}); scanning shard glob (slow)", flush=True)
             shards = pl.scan_parquet(
-                f"s3://{settings.get("s3", "data_bucket")}/{s3_prefix}/shards/*.parquet",
+                f"s3://{settings.get('s3', 'data_bucket')}/{s3_prefix}/shards/*.parquet",
                 storage_options=s3io.pl_opts).collect().to_pandas()
             print(f"shards from S3 glob: {shards.shape} in {time.time() - t:.0f}s", flush=True)
     else:
@@ -137,7 +140,7 @@ def main():
 
     for w, lev in variants:
         aggregate.SPY_WEIGHT, aggregate.STRATEGY_LEVERAGE = w, lev
-        base = (f"s3://{settings.get("s3", "data_bucket")}/{args.s3_prefix}/aggregate"
+        base = (f"s3://{settings.get('s3', 'data_bucket')}/{args.s3_prefix}/aggregate"
                 f"{aggregate.spy_weight_suffix(w, lev)}")
         t = time.time()
         print(f"\n=== finalize w={w:g} L={lev:g} -> {base}", flush=True)

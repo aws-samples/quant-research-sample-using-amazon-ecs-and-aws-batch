@@ -83,7 +83,7 @@ def main():
     ap.add_argument("--profile", default=None)
     args = ap.parse_args()
     s3io = S3IO(profile=args.profile)
-    df = pl.read_parquet(f"s3://{settings.get("s3", "data_bucket")}/{args.s3_prefix}/shards_consolidated/shards.parquet",
+    df = pl.read_parquet(f"s3://{settings.get('s3', 'data_bucket')}/{args.s3_prefix}/shards_consolidated/shards.parquet",
                          storage_options=s3io.pl_opts)
     syms = [s.upper() for s in args.reporters]
     page = (f"<!doctype html><html><head><meta charset='utf-8'><title>Peer presence — {', '.join(syms)}</title>"
@@ -95,8 +95,8 @@ def main():
             "returning shows as a gap in its column. Tier in red = the event fell in the LARGE tier that day.</p>"
             + "".join(table(df, s) for s in syms) + "</body></html>")
     key = args.out_key or f"{args.s3_prefix}/diagnostics/peer_stability/presence_matrix_{'_'.join(syms)}.html"
-    s3io.write_bytes(page.encode(), f"s3://{settings.get("s3", "data_bucket")}/{key}")
-    print(f"wrote s3://{settings.get("s3", "data_bucket")}/{key}\nview: http://127.0.0.1:8777/view?key={key}")
+    s3io.write_bytes(page.encode(), f"s3://{settings.get('s3', 'data_bucket')}/{key}")
+    print(f"wrote s3://{settings.get('s3', 'data_bucket')}/{key}\nview: http://127.0.0.1:8777/view?key={key}")
 
 
 if __name__ == "__main__":

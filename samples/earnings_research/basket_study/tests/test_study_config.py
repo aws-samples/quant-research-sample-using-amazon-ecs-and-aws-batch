@@ -35,7 +35,8 @@ def test_cell_matrices_match_package():
                     "xlk", "xlf", "xlv", "xly", "xlp", "xli", "xle", "xlb",
                     "xlc", "xlre", "xlu", "sec7",
                     "px_lt1", "px_1_5", "px_5_10", "px_10_50", "px_50_100", "px_ge100",
-                    "px_ge1", "px_ge5", "px_ge10", "px_ge50"]
+                    "px_ge1", "px_ge5", "px_ge10", "px_ge15", "px_ge20", "px_ge25", "px_ge30",
+                    "px_ge35", "px_ge40", "px_ge45", "px_ge50"]
 
 
 def test_exmicro_tier_list_equivalent():
@@ -94,9 +95,11 @@ def test_price_scopes_partition_the_price_line():
     edges = [c["price_bins"] for c in cms]
     assert edges[:6] == [[0, 1], [1, 5], [5, 10], [10, 50], [50, 100], [100, None]]
     assert [c["label"] for c in cms[:6]] == ["PX<1", "PX1-5", "PX5-10", "PX10-50", "PX50-100", "PX100+"]
-    # cumulative "and up" universes (user request 2026-09-23): 1+, 5+, 10+, 50+
-    assert edges[6:] == [[1, None], [5, None], [10, None], [50, None]]
-    assert [c["label"] for c in cms[6:]] == ["PX1+", "PX5+", "PX10+", "PX50+"]
+    # cumulative "and up" universes (user request 2026-09-23): 1+, 5+, 10+, 50+;
+    # 2026-10-09: the $10-50 range filled in at a $5 step (15+ .. 45+)
+    los = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+    assert edges[6:] == [[lo, None] for lo in los]
+    assert [c["label"] for c in cms[6:]] == [f"PX{lo}+" for lo in los]
 
 
 def test_scope_filter_price_bins():

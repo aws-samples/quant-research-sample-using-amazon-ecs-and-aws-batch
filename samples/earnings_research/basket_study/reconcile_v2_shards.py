@@ -96,7 +96,7 @@ def main() -> int:
         keep = cand[cand["event_id"].isin(set(ref["event_id"]))]
         buf = io.BytesIO()
         keep.to_parquet(buf, index=False)
-        uri = f"s3://{settings.get("s3", "data_bucket")}/{args.v2}/{MATCHED}"
+        uri = f"s3://{settings.get('s3', 'data_bucket')}/{args.v2}/{MATCHED}"
         s3io.write_bytes(buf.getvalue(), uri)
         print(f"wrote {uri}: {keep.shape} ({keep['event_id'].nunique()} events = v1 event set)")
     return 0
